@@ -153,7 +153,7 @@ async function resolveWorkflow(
     !bookmark.workflow_name
   ) {
     throw new Error(
-      `Workflow "${reference}" is not an available saved workflow. Run \`libretto cloud workflows search\`, then use publisher/workflow or save an alias.`,
+      `Workflow "${reference}" is not an available saved workflow. Run \`libretto cloud hosted-workflows search\`, then use publisher/workflow or save an alias.`,
     );
   }
   return {
@@ -219,7 +219,7 @@ export const getCloudWorkflowCommand = SimpleCLI.command({
       named: { json: jsonFlag },
     }).refine(
       (input) => Boolean(input.workflow),
-      "Usage: libretto cloud workflows get <workflow>",
+      "Usage: libretto cloud hosted-workflows get <workflow>",
     ),
   )
   .use(withCloudApiKey("inspect Hosted workflows"))
@@ -269,7 +269,7 @@ export const runCloudWorkflowCommand = SimpleCLI.command({
       },
     }).refine(
       (input) => Boolean(input.workflow),
-      "Usage: libretto cloud workflows run <workflow> [--params <json>]",
+      "Usage: libretto cloud hosted-workflows run <workflow> [--params <json>]",
     ),
   )
   .use(withCloudApiKey("run Hosted workflows"))
@@ -303,7 +303,7 @@ export const runCloudWorkflowCommand = SimpleCLI.command({
     printJsonOrLines(response, input.json, [
       `Job: ${response.job_id}`,
       `Status: ${response.status}`,
-      `Poll: libretto cloud workflows status ${response.job_id}`,
+      `Poll: libretto cloud hosted-workflows status ${response.job_id}`,
     ]);
     return response;
   });
@@ -320,7 +320,7 @@ async function getJob(
   });
   if (!job.hosted_workflow_id) {
     throw new Error(
-      `Job ${id} is not a Hosted workflow run. Use the Libretto Cloud jobs API to inspect tenant-owned deployed workflows.`,
+      `Job ${id} belongs to one of your tenant's deployed workflows. Use \`libretto cloud jobs status ${id}\`.`,
     );
   }
   return job;
@@ -346,7 +346,7 @@ export const statusCloudWorkflowCommand = SimpleCLI.command({
       },
     }).refine(
       (input) => Boolean(input.jobId),
-      "Usage: libretto cloud workflows status <job-id> [--watch]",
+      "Usage: libretto cloud hosted-workflows status <job-id> [--watch]",
     ),
   )
   .use(withCloudApiKey("read Hosted workflow runs"))
@@ -395,7 +395,7 @@ export const saveCloudWorkflowCommand = SimpleCLI.command({
       },
     }).refine(
       (input) => Boolean(input.workflow?.includes("/")),
-      "Usage: libretto cloud workflows save <publisher/workflow>",
+      "Usage: libretto cloud hosted-workflows save <publisher/workflow>",
     ),
   )
   .use(withCloudApiKey("save Hosted workflows"))
@@ -459,13 +459,13 @@ export const removeSavedCloudWorkflowCommand = SimpleCLI.command({
     SimpleCLI.input({
       positionals: [
         SimpleCLI.positional("id", z.string().uuid().optional(), {
-          help: "Bookmark id from `libretto cloud workflows saved`",
+          help: "Bookmark id from `libretto cloud hosted-workflows saved`",
         }),
       ],
       named: { json: jsonFlag },
     }).refine(
       (input) => Boolean(input.id),
-      "Usage: libretto cloud workflows remove <bookmark-id>",
+      "Usage: libretto cloud hosted-workflows remove <bookmark-id>",
     ),
   )
   .use(withCloudApiKey("remove saved Hosted workflows"))
@@ -483,8 +483,8 @@ export const removeSavedCloudWorkflowCommand = SimpleCLI.command({
     return response;
   });
 
-export const cloudWorkflowCommands = SimpleCLI.group({
-  description: "Discover, run, and save Hosted workflows",
+export const cloudHostedWorkflowCommands = SimpleCLI.group({
+  description: "Discover, run, and save external Hosted workflows",
   routes: {
     search: searchCloudWorkflowsCommand,
     get: getCloudWorkflowCommand,

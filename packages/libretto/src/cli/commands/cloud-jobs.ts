@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { SimpleCLI } from "affordance";
-import { orpcCall } from "../core/auth-fetch.js";
+import { orpcCall, type CredentialChoice } from "../core/auth-fetch.js";
 import { parseViewportArg } from "./browser.js";
 import { withCloudApiKey } from "./shared.js";
 
@@ -13,6 +13,17 @@ type CreateJobResponse = {
   status: JobStatus;
   message: string;
 };
+
+type JobResponse = {
+  job_id: string;
+  hosted_workflow_id?: string;
+  status: string;
+  result?: unknown;
+  error?: string;
+  live_view_url?: string | null;
+};
+
+const terminalStatuses = new Set(["completed", "failed", "cancelled"]);
 
 const createJobUsage =
   "Usage: libretto cloud jobs create <workflow> [--params <json> | --params-file <path>]";
@@ -124,7 +135,7 @@ export const createCloudJobInput = SimpleCLI.input({
   );
 
 export const createCloudJobCommand = SimpleCLI.command({
-  description: "Create a Libretto Cloud job for a deployed workflow",
+  description: "Run one of your tenant's deployed workflows",
 })
   .input(createCloudJobInput)
   .use(withCloudApiKey("create Libretto Cloud jobs"))
@@ -172,12 +183,97 @@ export const createCloudJobCommand = SimpleCLI.command({
     console.log(`Job created: ${response.job_id}`);
     console.log(`Status: ${response.status}`);
     console.log(response.message);
+    console.log(`Poll: libretto cloud jobs status ${response.job_id}`);
     return response.job_id;
   });
 
+async function getTenantWorkflowJob(
+  apiUrl: string,
+  credential: CredentialChoice,
+  id: string,
+): Promise<JobResponse> {
+  const job = await orpcCall<JobResponse>({
+    apiUrl,
+    path: "/v1/jobs/get",
+    input: { id },
+    credential,
+  });
+  if (job.hosted_workflow_id) {
+    throw new Error(
+      `Job ${id} is an external Hosted workflow run. Use \`libretto cloud hosted-workflows status ${id}\`.`,
+    );
+  }
+  return job;
+}
+
+export const statusCloudJobCommand = SimpleCLI.command({
+  description: "Get or watch one of your tenant's deployed workflow jobs",
+})
+  .input(
+    SimpleCLI.input({
+      positionals: [
+        SimpleCLI.positional("jobId", z.string().uuid().optional(), {
+          help: "Deployed workflow job id",
+        }),
+      ],
+      named: {
+        watch: SimpleCLI.flag({
+          help: "Poll until the job reaches a terminal status",
+        }),
+        intervalSeconds: SimpleCLI.option(
+          z.coerce.number().min(0.1).max(60).optional(),
+          {
+            name: "interval-seconds",
+            help: "Watch polling interval (default: 2)",
+          },
+        ),
+        json: SimpleCLI.flag({ help: "Print machine-readable JSON" }),
+      },
+    }).refine(
+      (input) => Boolean(input.jobId),
+      "Usage: libretto cloud jobs status <job-id> [--watch]",
+    ),
+  )
+  .use(withCloudApiKey("read deployed workflow jobs"))
+  .handle(async ({ input, ctx }) => {
+    let job = await getTenantWorkflowJob(
+      ctx.apiUrl,
+      ctx.credential,
+      input.jobId!,
+    );
+    let lastStatus: string | undefined;
+    while (input.watch && !terminalStatuses.has(job.status)) {
+      if (!input.json && job.status !== lastStatus) {
+        console.log(`Status: ${job.status}`);
+        lastStatus = job.status;
+      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, (input.intervalSeconds ?? 2) * 1000),
+      );
+      job = await getTenantWorkflowJob(
+        ctx.apiUrl,
+        ctx.credential,
+        input.jobId!,
+      );
+    }
+    if (input.json) {
+      console.log(JSON.stringify(job, null, 2));
+    } else {
+      console.log(`Job: ${job.job_id}`);
+      console.log(`Status: ${job.status}`);
+      if (job.live_view_url) console.log(`Live view: ${job.live_view_url}`);
+      if (job.result !== undefined) {
+        console.log(`Result: ${JSON.stringify(job.result)}`);
+      }
+      if (job.error) console.log(`Error: ${job.error}`);
+    }
+    return job;
+  });
+
 export const cloudJobCommands = SimpleCLI.group({
-  description: "Create and manage hosted jobs",
+  description: "Run and inspect your tenant's deployed workflows",
   routes: {
     create: createCloudJobCommand,
+    status: statusCloudJobCommand,
   },
 });

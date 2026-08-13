@@ -371,7 +371,7 @@ describe("basic CLI subprocess behavior", () => {
   test("prints cloud jobs create help", async ({ librettoCli }) => {
     const result = await librettoCli("help cloud jobs create");
     expect(result.stdout).toContain(
-      "Create a Libretto Cloud job for a deployed workflow",
+      "Run one of your tenant's deployed workflows",
     );
     expect(result.stdout).toContain("libretto cloud jobs create [workflow]");
     expect(result.stdout).toContain("--params-file");
@@ -382,6 +382,18 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("--viewport");
     expect(result.stdout).toContain("--residential-proxy");
     expect(result.stdout).toContain("--disable-default-proxy");
+    expect(result.stderr).toBe("");
+  });
+
+  test("prints cloud jobs status help", async ({ librettoCli }) => {
+    const result = await librettoCli("help cloud jobs status");
+    expect(result.stdout).toContain(
+      "Get or watch one of your tenant's deployed workflow jobs",
+    );
+    expect(result.stdout).toContain("libretto cloud jobs status [jobId]");
+    expect(result.stdout).toContain("--watch");
+    expect(result.stdout).toContain("--interval-seconds");
+    expect(result.stdout).toContain("--json");
     expect(result.stderr).toBe("");
   });
 
@@ -744,7 +756,7 @@ export default workflow("main", async (ctx) => {
       "auth <subcommand>  Hosted-platform auth commands",
     );
     expect(result.stderr).toContain(
-      "jobs <subcommand>  Create and manage hosted jobs",
+      "jobs <subcommand>  Run and inspect your tenant's deployed workflows",
     );
     expect(result.stderr).toContain(
       "schedules <subcommand>  Create and manage hosted schedules",
