@@ -4,6 +4,7 @@ import { expect } from "vitest";
 import { test } from "./fixtures";
 
 const bookmarkId = "c0908bc8-02f0-40e7-a96a-a22e8ac3333e";
+const unavailableBookmarkId = "e41afed0-b317-4754-a159-543bef15da2e";
 const jobId = "41aadfa4-3d22-4fd8-8494-c94fd88ce5de";
 
 test("cloud workflow commands cover catalogue, runs, and saved workflows", async ({
@@ -77,6 +78,13 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
             default_params: { region: "west" },
             available: true,
           },
+          {
+            id: unavailableBookmarkId,
+            alias: "retired",
+            tenant_slug: null,
+            workflow_name: null,
+            available: false,
+          },
         ],
       };
     } else if (
@@ -140,9 +148,16 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
   expect(JSON.parse(save.stdout)).toMatchObject({ bookmark: { id: bookmarkId } });
 
   const saved = await librettoCli("cloud published-workflows saved --json", env);
-  expect(JSON.parse(saved.stdout)).toMatchObject({
-    workflows: [{ alias: "patient", available: true }],
-  });
+  expect(JSON.parse(saved.stdout).workflows).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ alias: "patient", available: true }),
+    ]),
+  );
+  const savedHuman = await librettoCli("cloud published-workflows saved", env);
+  expect(savedHuman.stdout).toContain(
+    `${unavailableBookmarkId}: retired (publication unavailable) [unavailable]`,
+  );
+  expect(savedHuman.stdout).not.toContain("null/null");
 
   const run = await librettoCli(
     `cloud published-workflows run patient --params '{"patient_id":"p-1"}' --credentials '{"portal":"credential-1"}' --json`,

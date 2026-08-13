@@ -1,9 +1,9 @@
-import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { SimpleCLI } from "affordance";
 import { orpcCall } from "../core/auth-fetch.js";
 import { parseViewportArg } from "./browser.js";
 import { createCloudJobStatusCommand } from "./cloud-job-status.js";
+import { parseJsonObject, readJsonObjectFile } from "./cloud-json-input.js";
 import { withCloudApiKey } from "./shared.js";
 
 type JobStatus = "queued" | "starting_browser" | "running";
@@ -17,36 +17,6 @@ type CreateJobResponse = {
 
 const createJobUsage =
   "Usage: libretto cloud jobs create <workflow> [--params <json> | --params-file <path>]";
-
-function parseJsonObject(label: string, raw: string): Record<string, unknown> {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (error) {
-    throw new Error(
-      `Invalid JSON in ${label}: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error(`${label} must be a JSON object.`);
-  }
-  return parsed as Record<string, unknown>;
-}
-
-function readJsonObjectFile(
-  label: string,
-  filePath: string,
-): Record<string, unknown> {
-  let content: string;
-  try {
-    content = readFileSync(filePath, "utf8");
-  } catch {
-    throw new Error(
-      `Could not read ${label} "${filePath}". Ensure the file exists and is readable.`,
-    );
-  }
-  return parseJsonObject(label, content);
-}
 
 export const createCloudJobInput = SimpleCLI.input({
   positionals: [

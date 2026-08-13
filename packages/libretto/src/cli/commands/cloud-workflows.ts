@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { SimpleCLI } from "affordance";
 import { z } from "zod";
 import {
@@ -6,6 +5,7 @@ import {
   authFetch,
 } from "../core/auth-fetch.js";
 import { createCloudJobStatusCommand } from "./cloud-job-status.js";
+import { jsonObjectInput } from "./cloud-json-input.js";
 import { withCloudApiKey, type CloudApiKeyContext } from "./shared.js";
 
 type WorkflowSummary = {
@@ -22,43 +22,6 @@ type RunJobResponse = {
   job_id: string;
   status: string;
 };
-
-function parseJsonObject(label: string, raw: string): Record<string, unknown> {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (error) {
-    throw new Error(
-      `Invalid JSON in ${label}: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error(`${label} must be a JSON object.`);
-  }
-  return parsed as Record<string, unknown>;
-}
-
-function jsonObjectInput(
-  inlineLabel: string,
-  inline: string | undefined,
-  fileLabel: string,
-  filePath: string | undefined,
-): Record<string, unknown> {
-  if (inline && filePath) {
-    throw new Error(`Pass either ${inlineLabel} or ${fileLabel}, not both.`);
-  }
-  if (inline) return parseJsonObject(inlineLabel, inline);
-  if (!filePath) return {};
-  let content: string;
-  try {
-    content = readFileSync(filePath, "utf8");
-  } catch {
-    throw new Error(
-      `Could not read ${fileLabel} "${filePath}". Ensure the file exists and is readable.`,
-    );
-  }
-  return parseJsonObject(fileLabel, content);
-}
 
 async function cloudRestCall<TResult>(opts: {
   ctx: CloudApiKeyContext;
@@ -376,9 +339,13 @@ export const listSavedCloudWorkflowsCommand = SimpleCLI.command({
       input.json,
       workflows.length
         ? workflows.map((workflow) => {
+            const workflowKey =
+              workflow.tenant_slug && workflow.workflow_name
+                ? `${workflow.tenant_slug}/${workflow.workflow_name}`
+                : "publication unavailable";
             const name = workflow.alias
-              ? `${workflow.alias} (${workflow.tenant_slug}/${workflow.workflow_name})`
-              : `${workflow.tenant_slug}/${workflow.workflow_name}`;
+              ? `${workflow.alias} (${workflowKey})`
+              : workflowKey;
             return `${workflow.id}: ${name}${workflow.available ? "" : " [unavailable]"}`;
           })
         : ["No saved published workflows."],
