@@ -355,8 +355,8 @@ function EndpointBar({ method, url }: { method: string; url: string }) {
       <span className="inline-flex shrink-0 items-center border-r border-rule bg-accent/[0.08] px-4 font-mono text-[11px] font-semibold tracking-[0.1em] text-accent-bright">
         {method}
       </span>
-      <div className="min-w-0 flex-1 overflow-x-auto px-4 py-3 [scrollbar-width:none]">
-        <code className="whitespace-nowrap font-mono text-[12px] leading-5 text-ink">
+      <div className="min-w-0 flex-1 px-4 py-3">
+        <code className="break-all font-mono text-[12px] leading-5 text-ink sm:whitespace-nowrap">
           {url}
         </code>
       </div>
@@ -878,14 +878,16 @@ export function HostedWorkflowPage({
         })}
       </div>
 
+      {activeView === "api" && (
+        <div className="mt-6">
+          <EndpointBar method="POST" url={runUrl} />
+        </div>
+      )}
+
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
         <div className="min-w-0 space-y-6">
           {activeView === "api" ? (
             <>
-              <section>
-                <EndpointBar method="POST" url={runUrl} />
-              </section>
-
               <section>
                 <div className="border-b border-rule pb-4">
                   <h2 className="text-2xl font-medium tracking-tight text-ink">
