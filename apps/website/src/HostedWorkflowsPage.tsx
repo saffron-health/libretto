@@ -936,7 +936,7 @@ export function HostedWorkflowPage({
                 window.setTimeout(() => setCopied(false), 1500);
               }}
             >
-              {copied ? "Copied" : "Copy API instructions"}
+              {copied ? "Copied" : "Copy prompt to use API"}
             </Button>
             {!session && (
               <Button
