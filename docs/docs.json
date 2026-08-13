@@ -110,6 +110,7 @@
             "pages": [
               "reference/runtime/workflow",
               "reference/runtime/authentication",
+              "reference/runtime/sms-otp",
               "reference/runtime/network-requests",
               "reference/runtime/file-downloads",
               "reference/runtime/page-fallbacks",

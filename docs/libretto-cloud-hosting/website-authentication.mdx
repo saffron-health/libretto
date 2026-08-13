@@ -12,6 +12,7 @@ Hosted website authentication uses the same workflow code as local runs:
 - `credentials` declares which secrets the workflow can use for login.
 - `authProfile` declares the provider-native browser profile to reuse.
 - `librettoAuthenticate` checks whether the profile is signed in and runs sign-in if needed.
+- `claimSmsOtp` waits for a portal SMS one-time code on a tenant inbox number when the login texts MFA codes.
 
 ```typescript theme={null}
 import { librettoAuthenticate, workflow } from "libretto";
@@ -76,3 +77,47 @@ Local profiles are Playwright storage-state JSON files under `.libretto/profiles
 Hosted profiles are managed by the browser provider selected by Libretto Cloud. They are useful for deployed jobs and local CLI runs that use `--provider libretto-cloud`.
 
 The two are intentionally separate. To seed a hosted profile, run the workflow with Libretto Cloud and let sign-in create or refresh the provider-native profile.
+
+### SMS one-time codes
+
+When a portal texts a one-time code, use Libretto Cloud SMS OTP instead of scraping an inbox or putting an API key in workflow source.
+
+1. Provision a tenant inbox number (`libretto cloud sms-numbers provision --label <portal>` or the dashboard Phone numbers page).
+2. Register that full phone number (with country code) as the MFA phone on the portal account. Prefer one number per portal.
+3. In the workflow, await `claimSmsOtp` before clicking send-code, then `otp.wait()` for the code.
+
+Hosted jobs inject a short-lived job token automatically. Locally set `LIBRETTO_API_KEY` (same key as deploy and CLI).
+
+```typescript theme={null}
+import { claimSmsOtp, librettoAuthenticate, workflow } from "libretto";
+
+export default workflow("portalReport", {
+  startUrl: "https://portal.example.com",
+  credentials: ["username", "password"],
+  authProfile: { name: "portal", refresh: true },
+  async handler(ctx, input) {
+    await librettoAuthenticate(ctx, {
+      credentials: input.credentials,
+      isSignedIn: async ({ page }) =>
+        await page
+          .getByRole("button", { name: /account|sign out/i })
+          .isVisible()
+          .catch(() => false),
+      signIn: async ({ page }, credentials) => {
+        await page.goto("https://portal.example.com/login");
+        await page.getByLabel("Email").fill(credentials.username);
+        await page.getByLabel("Password").fill(credentials.password);
+        await page.getByRole("button", { name: /log in/i }).click();
+
+        const otp = await claimSmsOtp({ phoneNumberLabel: "uhc" });
+        await page.getByRole("button", { name: /send code/i }).click();
+        const { code } = await otp.wait();
+        await page.getByLabel("Code").fill(code);
+        await page.getByRole("button", { name: /verify/i }).click();
+      },
+    });
+  },
+});
+```
+
+See [`claimSmsOtp`](/reference/runtime/sms-otp).

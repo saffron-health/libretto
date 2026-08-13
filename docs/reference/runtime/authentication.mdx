@@ -85,3 +85,5 @@ After `signIn` runs, `librettoAuthenticate` calls `isSignedIn` again. If the ses
   Pair `librettoAuthenticate` with `authProfile: { name, refresh: true }` when
   a successful sign-in should update the profile for future runs.
 </Note>
+
+When sign-in needs a portal SMS one-time code, use [`claimSmsOtp`](/reference/runtime/sms-otp) inside `signIn`.
