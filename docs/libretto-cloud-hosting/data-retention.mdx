@@ -17,7 +17,7 @@ See also the [privacy policy](https://libretto.sh/privacy).
 | Saved credentials | Until you delete them, or the account is deleted |
 | Failure screenshots and page snapshots | 90 days |
 | Executor and workflow logs | 30 days |
-| Session recordings | A limited time after the run |
+| Session recordings | 30 days |
 
 Job results are the `result` payload on `POST /v1/jobs/get` and on `job.completed` webhooks. Libretto Cloud does not automatically delete job history.
 
@@ -25,7 +25,7 @@ Failure screenshots and page snapshots are captured when a hosted job fails. Sig
 
 Executor and workflow logs are the records returned by `POST /v1/logs/list`.
 
-Session recordings are available through `POST /v1/recordings/get` when a run captured a recording. Recording links expire. Request a new link for the same job or session while the recording still exists.
+Session recordings are available through `POST /v1/recordings/get` when a run captured a recording. Recording links expire. Request a new link for the same job or session while the recording still exists. The recording itself is kept for 30 days.
 
 ### Custom retention
 
