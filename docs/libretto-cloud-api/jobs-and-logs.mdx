@@ -39,6 +39,17 @@ curl -X POST "https://api.libretto.sh/v1/jobs/get" \
 
 ### Jobs
 
+The CLI `jobs` namespace is reserved for workflows deployed by your tenant:
+
+```bash
+libretto cloud jobs create check-eligibility --params '{"member_id":"123"}'
+libretto cloud jobs status <job-id>
+libretto cloud jobs status <job-id> --watch
+```
+
+Use `libretto cloud catalogue` instead when discovering or running a
+workflow publicly shared by another tenant.
+
 #### POST `/v1/jobs/create`
 
 Start a workflow job.

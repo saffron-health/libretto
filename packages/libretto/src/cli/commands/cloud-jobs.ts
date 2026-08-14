@@ -1,8 +1,9 @@
-import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { SimpleCLI } from "affordance";
 import { orpcCall } from "../core/auth-fetch.js";
 import { parseViewportArg } from "./browser.js";
+import { createCloudJobStatusCommand } from "./cloud-job-status.js";
+import { parseJsonObject, readJsonObjectFile } from "./cloud-json-input.js";
 import { withCloudApiKey } from "./shared.js";
 
 type JobStatus = "queued" | "starting_browser" | "running";
@@ -16,36 +17,6 @@ type CreateJobResponse = {
 
 const createJobUsage =
   "Usage: libretto cloud jobs create <workflow> [--params <json> | --params-file <path>]";
-
-function parseJsonObject(label: string, raw: string): Record<string, unknown> {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (error) {
-    throw new Error(
-      `Invalid JSON in ${label}: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error(`${label} must be a JSON object.`);
-  }
-  return parsed as Record<string, unknown>;
-}
-
-function readJsonObjectFile(
-  label: string,
-  filePath: string,
-): Record<string, unknown> {
-  let content: string;
-  try {
-    content = readFileSync(filePath, "utf8");
-  } catch {
-    throw new Error(
-      `Could not read ${label} "${filePath}". Ensure the file exists and is readable.`,
-    );
-  }
-  return parseJsonObject(label, content);
-}
 
 export const createCloudJobInput = SimpleCLI.input({
   positionals: [
@@ -124,7 +95,7 @@ export const createCloudJobInput = SimpleCLI.input({
   );
 
 export const createCloudJobCommand = SimpleCLI.command({
-  description: "Create a Libretto Cloud job for a deployed workflow",
+  description: "Run one of your tenant's deployed workflows",
 })
   .input(createCloudJobInput)
   .use(withCloudApiKey("create Libretto Cloud jobs"))
@@ -172,12 +143,19 @@ export const createCloudJobCommand = SimpleCLI.command({
     console.log(`Job created: ${response.job_id}`);
     console.log(`Status: ${response.status}`);
     console.log(response.message);
+    console.log(`Poll: libretto cloud jobs status ${response.job_id}`);
     return response.job_id;
   });
 
+export const statusCloudJobCommand = createCloudJobStatusCommand({
+  kind: "deployed",
+  namespace: "jobs",
+});
+
 export const cloudJobCommands = SimpleCLI.group({
-  description: "Create and manage hosted jobs",
+  description: "Run and inspect your tenant's deployed workflows",
   routes: {
     create: createCloudJobCommand,
+    status: statusCloudJobCommand,
   },
 });

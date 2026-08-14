@@ -4,6 +4,7 @@ import { browserCommands } from "./commands/browser.js";
 import { cloudCredentialCommands } from "./commands/cloud-credentials.js";
 import { cloudJobCommands } from "./commands/cloud-jobs.js";
 import { cloudScheduleCommands } from "./commands/cloud-schedules.js";
+import { cloudCatalogueCommands } from "./commands/cloud-catalogue.js";
 import { cloudSmsNumberCommands } from "./commands/cloud-sms-numbers.js";
 import { settingsCommands } from "./commands/cloud-settings.js";
 import {
@@ -39,6 +40,7 @@ export const cliRoutes = {
       settings: settingsCommands,
       share: shareWorkflowCommand,
       unshare: unshareWorkflowCommand,
+      catalogue: cloudCatalogueCommands,
     },
   }),
   experiments: experimentsCommand,
