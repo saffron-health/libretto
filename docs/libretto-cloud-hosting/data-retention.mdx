@@ -13,15 +13,16 @@ See also the [privacy policy](https://libretto.sh/privacy).
 
 | Data | Default retention |
 | --- | --- |
-| Job results and run history | For the life of your account |
-| Saved credentials | Until you delete them, or the account is deleted |
-| Failure screenshots and page snapshots | 90 days |
+| Job results and run history | For the life of your workspace |
+| Saved credentials | Until you delete them, or the workspace is deleted |
+| Deployed workflow code | Until you delete the workflow |
+| Failure screenshots and page HTML | 90 days |
 | Executor and workflow logs | 30 days |
 | Session recordings | 30 days |
 
-Job results are the `result` payload on `POST /v1/jobs/get` and on `job.completed` webhooks. Libretto Cloud does not automatically delete job history.
+Job results are the `result` payload on `POST /v1/jobs/get` and on `job.completed` webhooks. Libretto Cloud does not automatically delete job history. Failed and cancelled runs keep their error and stack instead of a result.
 
-Failure screenshots and page snapshots are captured when a hosted job fails. Signed download links expire quickly. The files themselves follow the 90-day window.
+Failure screenshots and page HTML are captured when your workflow code throws or times out, so a run that fails before your code starts may have neither. Signed download links are short-lived; request a new one when a link expires. The files themselves follow the 90-day window.
 
 Executor and workflow logs are the records returned by `POST /v1/logs/list`.
 
@@ -33,4 +34,8 @@ If you need a longer or shorter retention period, email `team@libretto.sh`. Cust
 
 ### Deleting data
 
-You can delete saved credentials and workflows through the API. Workspace owners can delete their account from the dashboard under account options; deleting the last account in a workspace also deletes the workspace and all of its data, including job history. To request deletion of job history without closing the account, email `team@libretto.sh`.
+Delete saved credentials with `POST /v1/credentials/delete` and workflows with `POST /v1/workflows/delete`.
+
+Owners can delete their account from the dashboard, under account options on the users page. If you are the only member of the workspace, this also deletes the workspace, its job history, credentials, workflows, and API keys. In a shared workspace it removes your own access and leaves workspace data in place, and a sole owner has to promote another owner first. Debug artifacts already in object storage age out on the schedules above rather than being purged at the moment of deletion.
+
+To delete job history without deleting the workspace, email `team@libretto.sh`.
