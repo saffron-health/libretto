@@ -97,9 +97,17 @@ export function PrivacyPage() {
             <Text as="p" className="text-muted">
               We encrypt data in transit. Saved automation credentials are encrypted at rest. We
               keep account and automation data while your account is active or as needed to provide
-              the service, meet legal duties, resolve disputes, and protect the service. You can
-              delete supported items from the Libretto dashboard or contact us to request deletion
-              of your account data.
+              the service, meet legal duties, resolve disputes, and protect the service. Debug
+              artifacts such as logs, failure screenshots, and session recordings are deleted on
+              shorter schedules published in our{" "}
+              <a
+                className="underline hover:text-ink"
+                href="https://libretto.sh/docs/libretto-cloud-hosting/data-retention"
+              >
+                data retention documentation
+              </a>
+              . You can delete supported items from the Libretto dashboard or contact us to request
+              deletion of your account data.
             </Text>
           </section>
 

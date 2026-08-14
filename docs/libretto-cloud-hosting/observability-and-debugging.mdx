@@ -7,7 +7,7 @@ title: Observability and Debugging
 
 ### Recordings and debug context
 
-Every hosted workflow run captures a browser recording. Use it with job state, logs, screenshots, and failure reports to understand what happened during the run.
+Hosted workflow runs capture a browser recording unless you create them with `headless: true` or the run fails before a browser starts. Use the recording with job state, logs, screenshots, and failure reports to understand what happened during the run.
 
 Use `/v1/jobs/get` for status, params, timestamps, result or error, and mapped stack.
 
@@ -18,6 +18,8 @@ Use `/v1/jobs/debugReport` for failed-run diagnosis, fix instructions, artifact 
 Use `/v1/logs/list` for workflow logs and Libretto executor logs from the job, filtered by `jobId`, workflow, or severity.
 
 See [Jobs and Logs](/libretto-cloud-api/jobs-and-logs) for the full API reference.
+
+Job results stay for the life of your workspace. Screenshots, logs, and recordings have shorter windows. See [Data retention](/libretto-cloud-hosting/data-retention).
 
 ### Failure emails
 
