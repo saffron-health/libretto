@@ -9,17 +9,20 @@ import {
 import { Navbar } from "./components/Navbar";
 import {
   authPost,
+  cloudApiUrl,
   getAuthStatus,
   getCloudSession,
   orpcCall,
   type AuthStatus,
 } from "./cloudApi";
 import { GitHubIcon } from "./icons";
-
-type AuthResponse = {
-  redirect?: boolean;
-  url?: string;
-};
+import {
+  authResponseDestination,
+  oauthAuthorizeUrl,
+  signedOAuthQuery,
+  withOAuthQuery,
+  type OAuthAuthResponse,
+} from "./oauthFlow";
 
 type AuthMode = "signin" | "signup";
 
@@ -169,6 +172,11 @@ export function SignInPage() {
     getCloudSession()
       .then((session) => {
         if (!session) return;
+        const oauthQuery = signedOAuthQuery(window.location.search);
+        if (oauthQuery) {
+          window.location.assign(oauthAuthorizeUrl(cloudApiUrl, oauthQuery));
+          return;
+        }
         if (getCliLoginParams()) {
           approveCliLogin().catch((err) => {
             setError(err instanceof Error ? err.message : "CLI login approval failed.");
@@ -194,18 +202,25 @@ export function SignInPage() {
     setError(null);
     setNotice(null);
     try {
-      const result = await authPost<AuthResponse>("/api/auth/sign-in/email", {
-        email,
-        password,
-        callbackURL: getCliLoginParams()
-          ? currentSigninCallbackUrl()
-          : `${window.location.origin}${withReturnTo(
-              "/signin",
-              sanitizeReturnToForAuthState(getSafeReturnTo(), true),
-            )}`,
-      });
-      if (result.url) {
-        window.location.assign(result.url);
+      const result = await authPost<OAuthAuthResponse>(
+        "/api/auth/sign-in/email",
+        withOAuthQuery(
+          {
+            email,
+            password,
+            callbackURL: getCliLoginParams()
+              ? currentSigninCallbackUrl()
+              : `${window.location.origin}${withReturnTo(
+                  "/signin",
+                  sanitizeReturnToForAuthState(getSafeReturnTo(), true),
+                )}`,
+          },
+          window.location.search,
+        ),
+      );
+      const destination = authResponseDestination(result);
+      if (destination) {
+        window.location.assign(destination);
         return;
       }
       if (await approveCliLogin()) return;
@@ -226,14 +241,25 @@ export function SignInPage() {
     try {
       const returnTo = getSafeReturnTo();
       const callbackReturnTo = sanitizeReturnToForAuthState(returnTo, false);
-      await authPost<AuthResponse>("/api/auth/sign-up/email", {
-        name,
-        email,
-        password,
-        callbackURL: getCliLoginParams()
-          ? currentSigninCallbackUrl()
-          : `${window.location.origin}${withReturnTo("/verify-email", callbackReturnTo)}`,
-      });
+      const result = await authPost<OAuthAuthResponse>(
+        "/api/auth/sign-up/email",
+        withOAuthQuery(
+          {
+            name,
+            email,
+            password,
+            callbackURL: getCliLoginParams()
+              ? currentSigninCallbackUrl()
+              : `${window.location.origin}${withReturnTo("/verify-email", callbackReturnTo)}`,
+          },
+          window.location.search,
+        ),
+      );
+      const destination = authResponseDestination(result);
+      if (destination) {
+        window.location.assign(destination);
+        return;
+      }
       if (await approveCliLogin()) return;
       window.location.assign(withReturnTo("/verify-email", callbackReturnTo));
     } catch (err) {
@@ -252,17 +278,24 @@ export function SignInPage() {
         returnTo,
         mode === "signin",
       );
-      const result = await authPost<AuthResponse>("/api/auth/sign-in/social", {
-        provider,
-        callbackURL: getCliLoginParams()
-          ? currentSigninCallbackUrl()
-          : `${window.location.origin}${withReturnTo(
-              "/signin",
-              callbackReturnTo,
-            )}`,
-      });
-      if (result.url) {
-        window.location.assign(result.url);
+      const result = await authPost<OAuthAuthResponse>(
+        "/api/auth/sign-in/social",
+        withOAuthQuery(
+          {
+            provider,
+            callbackURL: getCliLoginParams()
+              ? currentSigninCallbackUrl()
+              : `${window.location.origin}${withReturnTo(
+                  "/signin",
+                  callbackReturnTo,
+                )}`,
+          },
+          window.location.search,
+        ),
+      );
+      const destination = authResponseDestination(result);
+      if (destination) {
+        window.location.assign(destination);
         return;
       }
       if (await approveCliLogin()) return;

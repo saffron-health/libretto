@@ -30,6 +30,7 @@ import { Route as VsStagehandRouteImport } from './routes/vs/stagehand'
 import { Route as VsPlaywrightCodegenRouteImport } from './routes/vs/playwright-codegen'
 import { Route as VsBrowserUseRouteImport } from './routes/vs/browser-use'
 import { Route as OpenWorkflowsIdRouteImport } from './routes/open-workflows_.$id'
+import { Route as OauthContinueRouteImport } from './routes/oauth.continue'
 import { Route as MarketplaceIdRouteImport } from './routes/marketplace_.$id'
 import { Route as GithubSetupRouteImport } from './routes/github.setup'
 import { Route as DashboardPrAgentRouteImport } from './routes/dashboard_.pr-agent'
@@ -145,6 +146,11 @@ const OpenWorkflowsIdRoute = OpenWorkflowsIdRouteImport.update({
   path: '/open-workflows/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OauthContinueRoute = OauthContinueRouteImport.update({
+  id: '/oauth/continue',
+  path: '/oauth/continue',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MarketplaceIdRoute = MarketplaceIdRouteImport.update({
   id: '/marketplace_/$id',
   path: '/marketplace/$id',
@@ -218,6 +224,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/pr-agent': typeof DashboardPrAgentRoute
   '/github/setup': typeof GithubSetupRoute
   '/marketplace/$id': typeof MarketplaceIdRoute
+  '/oauth/continue': typeof OauthContinueRoute
   '/open-workflows/$id': typeof OpenWorkflowsIdRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
@@ -249,6 +256,7 @@ export interface FileRoutesByTo {
   '/dashboard/pr-agent': typeof DashboardPrAgentRoute
   '/github/setup': typeof GithubSetupRoute
   '/marketplace/$id': typeof MarketplaceIdRoute
+  '/oauth/continue': typeof OauthContinueRoute
   '/open-workflows/$id': typeof OpenWorkflowsIdRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
@@ -282,6 +290,7 @@ export interface FileRoutesById {
   '/dashboard_/pr-agent': typeof DashboardPrAgentRoute
   '/github/setup': typeof GithubSetupRoute
   '/marketplace_/$id': typeof MarketplaceIdRoute
+  '/oauth/continue': typeof OauthContinueRoute
   '/open-workflows_/$id': typeof OpenWorkflowsIdRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
@@ -316,6 +325,7 @@ export interface FileRouteTypes {
     | '/dashboard/pr-agent'
     | '/github/setup'
     | '/marketplace/$id'
+    | '/oauth/continue'
     | '/open-workflows/$id'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
@@ -347,6 +357,7 @@ export interface FileRouteTypes {
     | '/dashboard/pr-agent'
     | '/github/setup'
     | '/marketplace/$id'
+    | '/oauth/continue'
     | '/open-workflows/$id'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
@@ -379,6 +390,7 @@ export interface FileRouteTypes {
     | '/dashboard_/pr-agent'
     | '/github/setup'
     | '/marketplace_/$id'
+    | '/oauth/continue'
     | '/open-workflows_/$id'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
@@ -411,6 +423,7 @@ export interface RootRouteChildren {
   DashboardPrAgentRoute: typeof DashboardPrAgentRoute
   GithubSetupRoute: typeof GithubSetupRoute
   MarketplaceIdRoute: typeof MarketplaceIdRoute
+  OauthContinueRoute: typeof OauthContinueRoute
   OpenWorkflowsIdRoute: typeof OpenWorkflowsIdRoute
   VsBrowserUseRoute: typeof VsBrowserUseRoute
   VsPlaywrightCodegenRoute: typeof VsPlaywrightCodegenRoute
@@ -568,6 +581,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OpenWorkflowsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/oauth/continue': {
+      id: '/oauth/continue'
+      path: '/oauth/continue'
+      fullPath: '/oauth/continue'
+      preLoaderRoute: typeof OauthContinueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/marketplace_/$id': {
       id: '/marketplace_/$id'
       path: '/marketplace/$id'
@@ -671,6 +691,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardPrAgentRoute: DashboardPrAgentRoute,
   GithubSetupRoute: GithubSetupRoute,
   MarketplaceIdRoute: MarketplaceIdRoute,
+  OauthContinueRoute: OauthContinueRoute,
   OpenWorkflowsIdRoute: OpenWorkflowsIdRoute,
   VsBrowserUseRoute: VsBrowserUseRoute,
   VsPlaywrightCodegenRoute: VsPlaywrightCodegenRoute,
