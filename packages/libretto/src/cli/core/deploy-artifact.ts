@@ -1046,7 +1046,8 @@ import { existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
-import { getWorkflowFromModuleExports, workflow } from "libretto";
+
+const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
 
 const BUNDLE_HASH = ${JSON.stringify(bundleHash)};
 const BUNDLE_GZIP_BASE64 = ${JSON.stringify(bundleBase64)};
@@ -1108,35 +1109,57 @@ function ensureBundleFile() {
   return BUNDLE_FILENAME;
 }
 
-function createWorkflowProxy(workflowName, metadata) {
-  const handler = async (ctx, input) => {
-    const impl = loadImplementation();
-    const target = getWorkflowFromModuleExports(impl, workflowName);
-    if (!target || typeof target.run !== "function") {
-      throw new Error(
-        \`Expected exported workflow "\${workflowName}" to be available in the bundled deployment implementation.\`,
-      );
-    }
-    return await target.run(ctx, input);
-  };
+function isWorkflow(value) {
+  return (
+    value &&
+    typeof value === "object" &&
+    value[LIBRETTO_WORKFLOW_BRAND] === true &&
+    typeof value.name === "string" &&
+    typeof value.run === "function"
+  );
+}
 
-  return workflow(workflowName, {
-    credentials: Array.isArray(metadata?.credentialNames)
+function findWorkflow(moduleExports, workflowName) {
+  for (const [exportName, value] of Object.entries(moduleExports)) {
+    if (
+      exportName === "workflows" &&
+      value &&
+      typeof value === "object" &&
+      !isWorkflow(value)
+    ) {
+      const match = Object.values(value).find(
+        (candidate) => isWorkflow(candidate) && candidate.name === workflowName,
+      );
+      if (match) return match;
+      continue;
+    }
+    if (isWorkflow(value) && value.name === workflowName) return value;
+  }
+  return null;
+}
+
+function createWorkflowProxy(workflowName, metadata) {
+  return {
+    [LIBRETTO_WORKFLOW_BRAND]: true,
+    name: workflowName,
+    credentialNames: Array.isArray(metadata?.credentialNames)
       ? metadata.credentialNames
       : [],
-    ...(metadata?.authProfileName
-      ? {
-          authProfile: {
-            name: metadata.authProfileName,
-            ...(typeof metadata.authProfileRefresh === "boolean" ? { refresh: metadata.authProfileRefresh } : {}),
-          },
-        }
-      : {}),
-    ...(typeof metadata?.startUrl === "string" ? { startUrl: metadata.startUrl } : {}),
-    ...(typeof metadata?.gpu === "boolean" ? { gpu: metadata.gpu } : {}),
-    ...(metadata?.viewport ? { viewport: metadata.viewport } : {}),
-    handler,
-  });
+    authProfileName: metadata?.authProfileName,
+    authProfileRefresh: metadata?.authProfileRefresh,
+    startUrl: metadata?.startUrl,
+    gpu: metadata?.gpu,
+    viewport: metadata?.viewport,
+    async run(ctx, input) {
+      const target = findWorkflow(loadImplementation(), workflowName);
+      if (!target) {
+        throw new Error(
+          \`Expected exported workflow "\${workflowName}" to be available in the bundled deployment implementation.\`,
+        );
+      }
+      return await target.run(ctx, input);
+    },
+  };
 }
 
 ${exportLines}
@@ -1280,13 +1303,19 @@ export async function createHostedDeployPackage(
   const absSourceDir = resolve(args.sourceDir);
   ensureSourcePackageManifest(absSourceDir);
 
+  const additionalExternals = [...new Set(args.additionalExternals ?? [])];
+  if (additionalExternals.includes("libretto")) {
+    throw new Error(
+      'Libretto must stay bundled with the workflow so Cloud runs the project\'s selected version. Remove "libretto" from --external and deploy again.',
+    );
+  }
+
   const absEntryPoint = resolveEntryPointPath(absSourceDir, args.entryPoint);
   const tempRoot = mkdtempSync(join(tmpdir(), "libretto-deploy-"));
   const outputDir = join(tempRoot, "deploy");
   mkdirSync(outputDir, { recursive: true });
   const librettoDependency = resolveLibrettoDependency(absSourceDir);
 
-  const additionalExternals = [...new Set(args.additionalExternals ?? [])];
   // These packages stay out of the implementation bundle. The generated
   // package.json carries them into deploy-time installation, and the deployed
   // code resolves them from node_modules.
