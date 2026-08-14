@@ -69,6 +69,14 @@
   ],
   "rewrites": [
     {
+      "source": "/hosted-workflows/:tenantSlug/:workflowName",
+      "destination": "/hosted-workflows"
+    },
+    {
+      "source": "/open-workflows/:id",
+      "destination": "/open-workflows"
+    },
+    {
       "source": "/dashboard/workflows/:workflow",
       "destination": "/dashboard/workflows"
     },
