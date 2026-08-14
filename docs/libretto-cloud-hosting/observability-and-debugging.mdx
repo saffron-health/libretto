@@ -7,7 +7,7 @@ title: Observability and Debugging
 
 ### Recordings and debug context
 
-Every hosted workflow run captures a browser recording. Use it with job state, logs, screenshots, and failure reports to understand what happened during the run.
+Hosted workflow runs capture a browser recording unless you create them with `headless: true`. Use the recording with job state, logs, screenshots, and failure reports to understand what happened during the run.
 
 Use `/v1/jobs/get` for status, params, timestamps, result or error, and mapped stack.
 

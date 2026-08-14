@@ -18,7 +18,7 @@ See also the [privacy policy](https://libretto.sh/privacy).
 | Deployed workflow code | Until you delete the workflow |
 | Failure screenshots and page HTML | 90 days |
 | Executor and workflow logs | 30 days |
-| Session recordings | 30 days |
+| Session recordings | 30 days, for runs that captured one |
 
 Job results are the `result` payload on `POST /v1/jobs/get` and on `job.completed` webhooks. Libretto Cloud does not automatically delete job history. Failed and cancelled runs keep their error and stack instead of a result.
 
@@ -26,7 +26,7 @@ Failure screenshots and page HTML are captured when your workflow code throws or
 
 Executor and workflow logs are the records returned by `POST /v1/logs/list`. When a run fails and Libretto Cloud prepares a debug report, the logs it collected are stored alongside the other debug artifacts for that run and follow the 90-day window instead.
 
-Session recordings are available through `POST /v1/recordings/get` when a run captured a recording. Recording links expire. Request a new link for the same job or session while the recording still exists. The recording itself is kept for 30 days.
+Session recordings are available through `POST /v1/recordings/get`. Headful runs, the default, are recorded; runs created with `headless: true` are not, and neither are runs that fail before a browser starts. A recording is kept for 30 days, and viewing links can expire sooner than that, so request a new link if one stops working while the recording still exists.
 
 ### Custom retention
 
