@@ -56,11 +56,26 @@ describe("OAuth authentication flow", () => {
   });
 
   it("accepts either Better Auth redirect response field", () => {
-    expect(authResponseDestination({ url: "https://accounts.google.com" })).toBe(
-      "https://accounts.google.com",
-    );
-    expect(authResponseDestination({ uri: "https://github.com/login" })).toBe(
-      "https://github.com/login",
-    );
+    expect(
+      authResponseDestination(
+        { url: "https://accounts.google.com" },
+        "https://api.libretto.sh",
+      ),
+    ).toBe("https://accounts.google.com/");
+    expect(
+      authResponseDestination(
+        { uri: "https://github.com/login" },
+        "https://api.libretto.sh",
+      ),
+    ).toBe("https://github.com/login");
+  });
+
+  it("resolves relative Better Auth destinations against the API", () => {
+    expect(
+      authResponseDestination(
+        { uri: "/oauth/consent?sig=signed-value" },
+        "https://api.libretto.sh",
+      ),
+    ).toBe("https://api.libretto.sh/oauth/consent?sig=signed-value");
   });
 });

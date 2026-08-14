@@ -38,6 +38,8 @@ export function oauthAuthorizeUrl(apiUrl: string, oauthQuery: string): string {
 
 export function authResponseDestination(
   response: OAuthAuthResponse,
+  apiUrl: string,
 ): string | null {
-  return response.url ?? response.uri ?? null;
+  const destination = response.url ?? response.uri ?? null;
+  return destination ? new URL(destination, apiUrl).toString() : null;
 }

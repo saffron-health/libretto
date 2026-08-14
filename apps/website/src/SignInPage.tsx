@@ -218,7 +218,7 @@ export function SignInPage() {
           window.location.search,
         ),
       );
-      const destination = authResponseDestination(result);
+      const destination = authResponseDestination(result, cloudApiUrl);
       if (destination) {
         window.location.assign(destination);
         return;
@@ -255,7 +255,7 @@ export function SignInPage() {
           window.location.search,
         ),
       );
-      const destination = authResponseDestination(result);
+      const destination = authResponseDestination(result, cloudApiUrl);
       if (destination) {
         window.location.assign(destination);
         return;
@@ -293,7 +293,7 @@ export function SignInPage() {
           window.location.search,
         ),
       );
-      const destination = authResponseDestination(result);
+      const destination = authResponseDestination(result, cloudApiUrl);
       if (destination) {
         window.location.assign(destination);
         return;

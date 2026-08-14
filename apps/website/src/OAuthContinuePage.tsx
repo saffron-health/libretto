@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { withReturnTo } from "./authRedirect";
-import { authPost, getAuthStatus } from "./cloudApi";
+import { authPost, cloudApiUrl, getAuthStatus } from "./cloudApi";
 import { Navbar } from "./components/Navbar";
 import {
   authResponseDestination,
@@ -36,7 +36,7 @@ export function OAuthContinuePage() {
         "/api/auth/oauth2/continue",
         { postLogin: true, oauth_query: oauthQuery },
       );
-      const destination = authResponseDestination(result);
+      const destination = authResponseDestination(result, cloudApiUrl);
       if (!destination) {
         throw new Error("Libretto did not return an authorization destination.");
       }
