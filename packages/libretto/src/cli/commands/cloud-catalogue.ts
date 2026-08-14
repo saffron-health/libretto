@@ -80,7 +80,7 @@ async function savedWorkflows(
 ): Promise<WorkflowSummary[]> {
   const response = await cloudRestCall<{ workflows: WorkflowSummary[] }>({
     ctx,
-    path: "/v1/hosted-workflows/bookmarks",
+    path: "/v1/catalogue/bookmarks",
   });
   return response.workflows;
 }
@@ -110,7 +110,7 @@ async function resolveWorkflow(
     !bookmark.workflow_name
   ) {
     throw new Error(
-      `Workflow "${reference}" is not an available saved workflow. Run \`libretto cloud published-workflows search\`, then use publisher/workflow or save an alias.`,
+      `Workflow "${reference}" is not an available saved workflow. Run \`libretto cloud catalogue search\`, then use publisher/workflow or save an alias.`,
     );
   }
   return {
@@ -123,12 +123,14 @@ async function resolveWorkflow(
 const workflowReference = SimpleCLI.positional(
   "workflow",
   z.string().optional(),
-  { help: "Published workflow as publisher/workflow, saved alias, or bookmark id" },
+  {
+    help: "Catalogue workflow as publisher/workflow, saved alias, or bookmark id",
+  },
 );
 const jsonFlag = SimpleCLI.flag({ help: "Print machine-readable JSON" });
 
-export const searchCloudWorkflowsCommand = SimpleCLI.command({
-  description: "Search publicly shared workflows",
+export const searchCatalogueCommand = SimpleCLI.command({
+  description: "Search the Hosted workflow catalogue",
 })
   .input(
     SimpleCLI.input({
@@ -145,14 +147,14 @@ export const searchCloudWorkflowsCommand = SimpleCLI.command({
       },
     }),
   )
-  .use(withCloudApiKey("search published workflows"))
+  .use(withCloudApiKey("search the workflow catalogue"))
   .handle(async ({ input, ctx }) => {
     const query = new URLSearchParams();
     if (input.query) query.set("q", input.query);
     query.set("limit", String(input.limit ?? 20));
     const response = await cloudRestCall<{ workflows: WorkflowSummary[] }>({
       ctx,
-      path: `/v1/hosted-workflows?${query}`,
+      path: `/v1/catalogue?${query}`,
     });
     printJsonOrLines(
       response,
@@ -162,13 +164,13 @@ export const searchCloudWorkflowsCommand = SimpleCLI.command({
             (workflow) =>
               `${workflow.tenant_slug}/${workflow.workflow_name}${workflow.description ? ` — ${workflow.description}` : ""}`,
           )
-        : ["No published workflows found."],
+        : ["No catalogue workflows found."],
     );
     return response;
   });
 
-export const getCloudWorkflowCommand = SimpleCLI.command({
-  description: "Show a published workflow's schema and credential requirements",
+export const getCatalogueWorkflowCommand = SimpleCLI.command({
+  description: "Show a catalogue workflow's schema and credential requirements",
 })
   .input(
     SimpleCLI.input({
@@ -176,15 +178,15 @@ export const getCloudWorkflowCommand = SimpleCLI.command({
       named: { json: jsonFlag },
     }).refine(
       (input) => Boolean(input.workflow),
-      "Usage: libretto cloud published-workflows get <workflow>",
+      "Usage: libretto cloud catalogue get <workflow>",
     ),
   )
-  .use(withCloudApiKey("inspect published workflows"))
+  .use(withCloudApiKey("inspect catalogue workflows"))
   .handle(async ({ input, ctx }) => {
     const workflow = await resolveWorkflow(ctx, input.workflow!);
     const response = await cloudRestCall<Record<string, unknown>>({
       ctx,
-      path: `/v1/hosted-workflows/${encodeURIComponent(workflow.tenantSlug)}/${encodeURIComponent(workflow.workflowName)}`,
+      path: `/v1/catalogue/${encodeURIComponent(workflow.tenantSlug)}/${encodeURIComponent(workflow.workflowName)}`,
     });
     const output = { workflow: response, default_params: workflow.defaultParams };
     printJsonOrLines(output, input.json, [
@@ -197,8 +199,8 @@ export const getCloudWorkflowCommand = SimpleCLI.command({
     return output;
   });
 
-export const runCloudWorkflowCommand = SimpleCLI.command({
-  description: "Run a published workflow and return its job id",
+export const runCatalogueWorkflowCommand = SimpleCLI.command({
+  description: "Run a catalogue workflow and return its job id",
 })
   .input(
     SimpleCLI.input({
@@ -226,10 +228,10 @@ export const runCloudWorkflowCommand = SimpleCLI.command({
       },
     }).refine(
       (input) => Boolean(input.workflow),
-      "Usage: libretto cloud published-workflows run <workflow> [--params <json>]",
+      "Usage: libretto cloud catalogue run <workflow> [--params <json>]",
     ),
   )
-  .use(withCloudApiKey("run published workflows"))
+  .use(withCloudApiKey("run catalogue workflows"))
   .handle(async ({ input, ctx }) => {
     const workflow = await resolveWorkflow(ctx, input.workflow!);
     const params = jsonObjectInput(
@@ -247,7 +249,7 @@ export const runCloudWorkflowCommand = SimpleCLI.command({
     const response = await cloudRestCall<RunJobResponse>({
       ctx,
       method: "POST",
-      path: `/v1/hosted-workflows/run/${encodeURIComponent(workflow.tenantSlug)}/${encodeURIComponent(workflow.workflowName)}`,
+      path: `/v1/catalogue/run/${encodeURIComponent(workflow.tenantSlug)}/${encodeURIComponent(workflow.workflowName)}`,
       body: {
         params: { ...workflow.defaultParams, ...params },
         ...(Object.keys(credentials).length > 0 ? { credentials } : {}),
@@ -260,18 +262,18 @@ export const runCloudWorkflowCommand = SimpleCLI.command({
     printJsonOrLines(response, input.json, [
       `Job: ${response.job_id}`,
       `Status: ${response.status}`,
-      `Poll: libretto cloud published-workflows status ${response.job_id}`,
+      `Poll: libretto cloud catalogue status ${response.job_id}`,
     ]);
     return response;
   });
 
-export const statusCloudWorkflowCommand = createCloudJobStatusCommand({
-  kind: "published",
-  namespace: "published-workflows",
+export const statusCatalogueWorkflowCommand = createCloudJobStatusCommand({
+  kind: "catalogue",
+  namespace: "catalogue",
 });
 
-export const saveCloudWorkflowCommand = SimpleCLI.command({
-  description: "Save a published workflow for this Libretto Cloud workspace",
+export const saveCatalogueWorkflowCommand = SimpleCLI.command({
+  description: "Save a catalogue workflow for this Libretto Cloud workspace",
 })
   .input(
     SimpleCLI.input({
@@ -292,10 +294,10 @@ export const saveCloudWorkflowCommand = SimpleCLI.command({
       },
     }).refine(
       (input) => Boolean(input.workflow?.includes("/")),
-      "Usage: libretto cloud published-workflows save <publisher/workflow>",
+      "Usage: libretto cloud catalogue save <publisher/workflow>",
     ),
   )
-  .use(withCloudApiKey("save published workflows"))
+  .use(withCloudApiKey("save catalogue workflows"))
   .handle(async ({ input, ctx }) => {
     const defaultParams = jsonObjectInput(
       "--defaults",
@@ -308,7 +310,7 @@ export const saveCloudWorkflowCommand = SimpleCLI.command({
     }>({
       ctx,
       method: "POST",
-      path: "/v1/hosted-workflows/bookmarks",
+      path: "/v1/catalogue/bookmarks",
       body: {
         workflow: input.workflow,
         alias: input.alias,
@@ -324,13 +326,13 @@ export const saveCloudWorkflowCommand = SimpleCLI.command({
     return response;
   });
 
-export const listSavedCloudWorkflowsCommand = SimpleCLI.command({
-  description: "List published workflows saved by this Libretto Cloud workspace",
+export const listSavedCatalogueWorkflowsCommand = SimpleCLI.command({
+  description: "List catalogue workflows saved by this Libretto Cloud workspace",
 })
   .input(
     SimpleCLI.input({ positionals: [], named: { json: jsonFlag } }),
   )
-  .use(withCloudApiKey("list saved published workflows"))
+  .use(withCloudApiKey("list saved catalogue workflows"))
   .handle(async ({ input, ctx }) => {
     const workflows = await savedWorkflows(ctx);
     const response = { workflows };
@@ -342,39 +344,39 @@ export const listSavedCloudWorkflowsCommand = SimpleCLI.command({
             const workflowKey =
               workflow.tenant_slug && workflow.workflow_name
                 ? `${workflow.tenant_slug}/${workflow.workflow_name}`
-                : "publication unavailable";
+                : "catalogue entry unavailable";
             const name = workflow.alias
               ? `${workflow.alias} (${workflowKey})`
               : workflowKey;
             return `${workflow.id}: ${name}${workflow.available ? "" : " [unavailable]"}`;
           })
-        : ["No saved published workflows."],
+        : ["No saved catalogue workflows."],
     );
     return response;
   });
 
-export const removeSavedCloudWorkflowCommand = SimpleCLI.command({
-  description: "Remove a saved published workflow by bookmark id",
+export const removeSavedCatalogueWorkflowCommand = SimpleCLI.command({
+  description: "Remove a saved catalogue workflow by bookmark id",
 })
   .input(
     SimpleCLI.input({
       positionals: [
         SimpleCLI.positional("id", z.string().uuid().optional(), {
-          help: "Bookmark id from `libretto cloud published-workflows saved`",
+          help: "Bookmark id from `libretto cloud catalogue saved`",
         }),
       ],
       named: { json: jsonFlag },
     }).refine(
       (input) => Boolean(input.id),
-      "Usage: libretto cloud published-workflows remove <bookmark-id>",
+      "Usage: libretto cloud catalogue remove <bookmark-id>",
     ),
   )
-  .use(withCloudApiKey("remove saved published workflows"))
+  .use(withCloudApiKey("remove saved catalogue workflows"))
   .handle(async ({ input, ctx }) => {
     const response = await cloudRestCall<{ removed: boolean; id: string }>({
       ctx,
       method: "DELETE",
-      path: `/v1/hosted-workflows/bookmarks/${input.id}`,
+      path: `/v1/catalogue/bookmarks/${input.id}`,
     });
     printJsonOrLines(response, input.json, [
       response.removed
@@ -384,15 +386,15 @@ export const removeSavedCloudWorkflowCommand = SimpleCLI.command({
     return response;
   });
 
-export const cloudPublishedWorkflowCommands = SimpleCLI.group({
+export const cloudCatalogueCommands = SimpleCLI.group({
   description: "Discover, run, and save publicly shared workflows",
   routes: {
-    search: searchCloudWorkflowsCommand,
-    get: getCloudWorkflowCommand,
-    run: runCloudWorkflowCommand,
-    status: statusCloudWorkflowCommand,
-    save: saveCloudWorkflowCommand,
-    saved: listSavedCloudWorkflowsCommand,
-    remove: removeSavedCloudWorkflowCommand,
+    search: searchCatalogueCommand,
+    get: getCatalogueWorkflowCommand,
+    run: runCatalogueWorkflowCommand,
+    status: statusCatalogueWorkflowCommand,
+    save: saveCatalogueWorkflowCommand,
+    saved: listSavedCatalogueWorkflowsCommand,
+    remove: removeSavedCatalogueWorkflowCommand,
   },
 });

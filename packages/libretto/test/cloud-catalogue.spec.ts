@@ -36,7 +36,7 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
     });
 
     let body: unknown;
-    if (path.startsWith("/v1/hosted-workflows?q=")) {
+    if (path.startsWith("/v1/catalogue?q=")) {
       body = {
         workflows: [
           {
@@ -46,7 +46,7 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
           },
         ],
       };
-    } else if (path === "/v1/hosted-workflows/acme/patient-lookup") {
+    } else if (path === "/v1/catalogue/acme/patient-lookup") {
       body = {
         tenant_slug: "acme",
         workflow_name: "patient-lookup",
@@ -54,7 +54,7 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
         credential_requirements: [],
       };
     } else if (
-      path === "/v1/hosted-workflows/bookmarks" &&
+      path === "/v1/catalogue/bookmarks" &&
       request.method === "POST"
     ) {
       body = {
@@ -65,7 +65,7 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
         },
       };
     } else if (
-      path === "/v1/hosted-workflows/bookmarks" &&
+      path === "/v1/catalogue/bookmarks" &&
       request.method === "GET"
     ) {
       body = {
@@ -88,7 +88,7 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
         ],
       };
     } else if (
-      path === "/v1/hosted-workflows/run/acme/patient-lookup"
+      path === "/v1/catalogue/run/acme/patient-lookup"
     ) {
       body = { job_id: jobId, status: "queued" };
     } else if (path === "/v1/jobs/get") {
@@ -101,7 +101,7 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
           ...(statusCalls === 1 ? {} : { result: { patient_id: "p-1" } }),
         },
       };
-    } else if (path === `/v1/hosted-workflows/bookmarks/${bookmarkId}`) {
+    } else if (path === `/v1/catalogue/bookmarks/${bookmarkId}`) {
       body = { id: bookmarkId, removed: true };
     } else {
       response.writeHead(404, { "Content-Type": "application/json" });
@@ -125,7 +125,7 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
   };
 
   const search = await librettoCli(
-    "cloud published-workflows search patient --limit 5 --json",
+    "cloud catalogue search patient --limit 5 --json",
     env,
   );
   expect(JSON.parse(search.stdout)).toMatchObject({
@@ -133,7 +133,7 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
   });
 
   const get = await librettoCli(
-    "cloud published-workflows get acme/patient-lookup --json",
+    "cloud catalogue get acme/patient-lookup --json",
     env,
   );
   expect(JSON.parse(get.stdout)).toMatchObject({
@@ -142,31 +142,31 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
   });
 
   const save = await librettoCli(
-    `cloud published-workflows save acme/patient-lookup --alias patient --defaults '{"region":"west"}' --json`,
+    `cloud catalogue save acme/patient-lookup --alias patient --defaults '{"region":"west"}' --json`,
     env,
   );
   expect(JSON.parse(save.stdout)).toMatchObject({ bookmark: { id: bookmarkId } });
 
-  const saved = await librettoCli("cloud published-workflows saved --json", env);
+  const saved = await librettoCli("cloud catalogue saved --json", env);
   expect(JSON.parse(saved.stdout).workflows).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ alias: "patient", available: true }),
     ]),
   );
-  const savedHuman = await librettoCli("cloud published-workflows saved", env);
+  const savedHuman = await librettoCli("cloud catalogue saved", env);
   expect(savedHuman.stdout).toContain(
-    `${unavailableBookmarkId}: retired (publication unavailable) [unavailable]`,
+    `${unavailableBookmarkId}: retired (catalogue entry unavailable) [unavailable]`,
   );
   expect(savedHuman.stdout).not.toContain("null/null");
 
   const run = await librettoCli(
-    `cloud published-workflows run patient --params '{"patient_id":"p-1"}' --credentials '{"portal":"credential-1"}' --json`,
+    `cloud catalogue run patient --params '{"patient_id":"p-1"}' --credentials '{"portal":"credential-1"}' --json`,
     env,
   );
   expect(JSON.parse(run.stdout)).toMatchObject({ job_id: jobId });
 
   const status = await librettoCli(
-    `cloud published-workflows status ${jobId} --watch --interval-seconds 0.1 --json`,
+    `cloud catalogue status ${jobId} --watch --interval-seconds 0.1 --json`,
     env,
   );
   expect(JSON.parse(status.stdout)).toMatchObject({
@@ -176,7 +176,7 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
   expect(statusCalls).toBe(2);
 
   const remove = await librettoCli(
-    `cloud published-workflows remove ${bookmarkId} --json`,
+    `cloud catalogue remove ${bookmarkId} --json`,
     env,
   );
   expect(JSON.parse(remove.stdout)).toEqual({ id: bookmarkId, removed: true });
@@ -187,7 +187,7 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
   expect(
     requests.find(
       (request) =>
-        request.path === "/v1/hosted-workflows/run/acme/patient-lookup",
+        request.path === "/v1/catalogue/run/acme/patient-lookup",
     )?.body,
   ).toEqual({
     params: { region: "west", patient_id: "p-1" },
@@ -197,11 +197,11 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
 });
 
 test("cloud workflow commands require an API key", async ({ librettoCli }) => {
-  const result = await librettoCli("cloud published-workflows search", {
+  const result = await librettoCli("cloud catalogue search", {
     LIBRETTO_API_KEY: undefined,
   });
   expect(result.stderr).toContain(
-    "LIBRETTO_API_KEY is required to search published workflows.",
+    "LIBRETTO_API_KEY is required to search the workflow catalogue.",
   );
   expect(result.stderr).toContain("libretto cloud auth api-key issue");
 });

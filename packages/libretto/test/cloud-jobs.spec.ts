@@ -66,7 +66,7 @@ test("cloud jobs status watches a tenant-owned deployed workflow job", async ({
   ]);
 });
 
-test("cloud jobs status directs published runs to published-workflows", async ({
+test("cloud jobs status directs catalogue runs to catalogue", async ({
   librettoCli,
   onTestFinished,
 }) => {
@@ -97,6 +97,6 @@ test("cloud jobs status directs published runs to published-workflows", async ({
   });
 
   expect(result.stderr).toContain(
-    `libretto cloud published-workflows status ${hostedJobId}`,
+    `libretto cloud catalogue status ${hostedJobId}`,
   );
 });

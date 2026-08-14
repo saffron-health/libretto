@@ -24,10 +24,10 @@ async function getJob(ctx: CloudApiKeyContext, id: string): Promise<JobResponse>
 }
 
 export function createCloudJobStatusCommand(options: {
-  kind: "deployed" | "published";
-  namespace: "jobs" | "published-workflows";
+  kind: "deployed" | "catalogue";
+  namespace: "jobs" | "catalogue";
 }) {
-  const published = options.kind === "published";
+  const catalogue = options.kind === "catalogue";
   return SimpleCLI.command({
     description: `Get or watch a ${options.kind} workflow job`,
   })
@@ -35,7 +35,7 @@ export function createCloudJobStatusCommand(options: {
       SimpleCLI.input({
         positionals: [
           SimpleCLI.positional("jobId", z.string().uuid().optional(), {
-            help: `${published ? "Published" : "Deployed"} workflow job id`,
+            help: `${catalogue ? "Catalogue" : "Deployed"} workflow job id`,
           }),
         ],
         named: {
@@ -59,10 +59,10 @@ export function createCloudJobStatusCommand(options: {
     .use(withCloudApiKey(`read ${options.kind} workflow jobs`))
     .handle(async ({ input, ctx }) => {
       let job = await getJob(ctx, input.jobId!);
-      if (Boolean(job.hosted_workflow_id) !== published) {
-        const correctNamespace = published ? "jobs" : "published-workflows";
+      if (Boolean(job.hosted_workflow_id) !== catalogue) {
+        const correctNamespace = catalogue ? "jobs" : "catalogue";
         throw new Error(
-          `Job ${input.jobId} is a ${published ? "deployed" : "published"} workflow run. Use \`libretto cloud ${correctNamespace} status ${input.jobId}\`.`,
+          `Job ${input.jobId} is a ${catalogue ? "deployed" : "catalogue"} workflow run. Use \`libretto cloud ${correctNamespace} status ${input.jobId}\`.`,
         );
       }
       let lastStatus: string | undefined;

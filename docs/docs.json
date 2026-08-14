@@ -197,7 +197,7 @@
               "libretto-cloud-api/sessions",
               "libretto-cloud-api/recordings",
               "libretto-cloud-api/deployments-and-workflows",
-              "libretto-cloud-api/hosted-workflows",
+              "libretto-cloud-api/catalogue",
               "libretto-cloud-api/sms-otp",
               "libretto-cloud-api/jobs-and-logs",
               "libretto-cloud-api/credentials",

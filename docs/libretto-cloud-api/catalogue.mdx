@@ -1,15 +1,15 @@
 ---
-title: Published workflows
+title: Workflow catalogue
 "og:image": "https://libretto.sh/docs/og/libretto-cloud-api/hosted-workflows.png"
 ---
 
 > Search, run, and save public workflows shared by other Libretto Cloud tenants.
 
-Published workflow commands require `LIBRETTO_API_KEY`. The API key's tenant owns
-each run and bookmark. Publishers do not receive access to the caller's tenant,
+Catalogue commands require `LIBRETTO_API_KEY`. The API key's tenant owns each
+run and bookmark. Publishers do not receive access to the caller's tenant,
 credentials, or results.
 
-Each published workflow also exposes reviewed source code on its public page.
+Each catalogue workflow also exposes reviewed source code on its public page.
 See [Sharing workflows externally](/libretto-cloud-hosting/sharing-workflows-externally)
 for the publisher flow.
 
@@ -18,15 +18,15 @@ for the publisher flow.
 Search the public catalogue and inspect a workflow before running it:
 
 ```bash
-libretto cloud published-workflows search eligibility
-libretto cloud published-workflows get acme/check-eligibility
+libretto cloud catalogue search eligibility
+libretto cloud catalogue get acme/check-eligibility
 ```
 
 Start a run with input parameters and references to credentials already stored
 in your Libretto Cloud tenant:
 
 ```bash
-libretto cloud published-workflows run acme/check-eligibility \
+libretto cloud catalogue run acme/check-eligibility \
   --params '{"member_id":"123"}' \
   --credentials '{"portal_login":"payer-portal"}'
 ```
@@ -35,21 +35,21 @@ The command returns a job ID. Poll once or wait until it reaches a terminal
 state:
 
 ```bash
-libretto cloud published-workflows status <job-id>
-libretto cloud published-workflows status <job-id> --watch
+libretto cloud catalogue status <job-id>
+libretto cloud catalogue status <job-id> --watch
 ```
 
 Save a workflow with an optional alias, notes, and non-secret defaults:
 
 ```bash
-libretto cloud published-workflows save acme/check-eligibility \
+libretto cloud catalogue save acme/check-eligibility \
   --alias eligibility \
   --notes "Default west region" \
   --defaults '{"region":"west"}'
 
-libretto cloud published-workflows saved
-libretto cloud published-workflows run eligibility --params '{"member_id":"123"}'
-libretto cloud published-workflows remove <bookmark-id>
+libretto cloud catalogue saved
+libretto cloud catalogue run eligibility --params '{"member_id":"123"}'
+libretto cloud catalogue remove <bookmark-id>
 ```
 
 Explicit run parameters override saved defaults. Use `--json` on any command
@@ -66,12 +66,12 @@ All routes require `x-api-key`.
 
 | Method | Route | Purpose |
 | --- | --- | --- |
-| `GET` | `/v1/hosted-workflows?q=<query>&limit=<limit>` | Search the catalogue. |
-| `GET` | `/v1/hosted-workflows/:publisher/:workflow` | Inspect one workflow. |
-| `POST` | `/v1/hosted-workflows/run/:publisher/:workflow` | Queue a run. |
-| `GET` | `/v1/hosted-workflows/bookmarks` | List tenant bookmarks. |
-| `POST` | `/v1/hosted-workflows/bookmarks` | Save or update a bookmark. |
-| `DELETE` | `/v1/hosted-workflows/bookmarks/:id` | Remove a bookmark. |
+| `GET` | `/v1/catalogue?q=<query>&limit=<limit>` | Search the catalogue. |
+| `GET` | `/v1/catalogue/:publisher/:workflow` | Inspect one workflow. |
+| `POST` | `/v1/catalogue/run/:publisher/:workflow` | Queue a run. |
+| `GET` | `/v1/catalogue/bookmarks` | List tenant bookmarks. |
+| `POST` | `/v1/catalogue/bookmarks` | Save or update a bookmark. |
+| `DELETE` | `/v1/catalogue/bookmarks/:id` | Remove a bookmark. |
 
 Poll run results with `POST /v1/jobs/get`. See
 [Jobs and logs](/libretto-cloud-api/jobs-and-logs) for the response fields.
