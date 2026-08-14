@@ -130,6 +130,7 @@ export {
   LibrettoWorkflow,
   LibrettoWorkflowInputError,
   LIBRETTO_WORKFLOW_BRAND,
+  LIBRETTO_WORKFLOW_RUNTIME_AUTH_BRAND,
   validateWorkflowInput,
   workflow,
   type ExportedLibrettoWorkflow,

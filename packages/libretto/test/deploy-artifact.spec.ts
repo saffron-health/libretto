@@ -14,7 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 import { build } from "esbuild";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHostedDeployPackage } from "../src/cli/core/deploy-artifact.js";
 
 function writeJson(path: string, value: unknown): void {
@@ -67,6 +67,7 @@ describe("createHostedDeployPackage", () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     for (const cleanup of cleanups.splice(0)) {
       cleanup();
     }
@@ -95,6 +96,53 @@ describe("createHostedDeployPackage", () => {
       rmSync(workspaceRoot, { force: true, recursive: true });
     });
     return workspaceRoot;
+  }
+
+  function installFixtureLibretto(args: {
+    runtimeAuth: boolean;
+    version: string;
+    workspaceRoot: string;
+  }): void {
+    const packageDir = join(args.workspaceRoot, "node_modules", "libretto");
+    rmSync(packageDir, { force: true, recursive: true });
+    mkdirSync(packageDir, { recursive: true });
+    writeJson(join(packageDir, "package.json"), {
+      name: "libretto",
+      version: args.version,
+      type: "module",
+      exports: "./index.js",
+    });
+    writeFileSync(
+      join(packageDir, "index.js"),
+      [
+        'const WORKFLOW_BRAND = Symbol.for("libretto.workflow");',
+        "",
+        "export function workflow(name, definitionOrHandler) {",
+        "  const definition = typeof definitionOrHandler === \"function\"",
+        "    ? { handler: definitionOrHandler }",
+        "    : definitionOrHandler;",
+        "  return {",
+        "    [WORKFLOW_BRAND]: true,",
+        "    name,",
+        "    credentialNames: [],",
+        "    async run(ctx, input) {",
+        ...(args.runtimeAuth
+          ? [
+              "      const { __libretto: runtime, ...handlerInput } = input;",
+              "      return definition.handler(ctx, handlerInput, runtime);",
+            ]
+          : [
+              "      if (definition.strictInput && Object.keys(input).some((key) => key !== \"value\")) {",
+              '        throw new Error(`Unknown input keys: ${Object.keys(input).join(",")}`);',
+              "      }",
+              "      return definition.handler(ctx, input);",
+            ]),
+        "    },",
+        "  };",
+        "}",
+        "",
+      ].join("\n"),
+    );
   }
 
   function trackDeployPackage(
@@ -269,7 +317,6 @@ describe("createHostedDeployPackage", () => {
       ),
     ).toContain("formatMessage");
     expect(bundle).toContain('createWorkflowProxy("testWorkflow", {"credentialNames":[]})');
-    expect(bundle).toContain("return workflow(workflowName, {");
     expect(implementation).toContain("bundled from workspace source");
     expect(implementation).toContain("formatted");
     expect(implementation).not.toContain("@repo/config/message");
@@ -476,6 +523,240 @@ describe("createHostedDeployPackage", () => {
     });
     expect(bundle).toContain('createWorkflowProxy("testWorkflow", {"credentialNames":[]})');
     expect(implementation).toContain("lodash");
+  });
+
+  it("passes hosted runtime auth to the deployment-selected Libretto", async () => {
+    const workspaceRoot = createWorkspaceRoot();
+    const sourceDir = join(workspaceRoot, "apps", "worker");
+    const entryPoint = join(sourceDir, "src", "workflow.ts");
+    const outfile = join(workspaceRoot, "hosted-deployment.cjs");
+
+    mkdirSync(join(sourceDir, "src"), { recursive: true });
+    writeJson(join(sourceDir, "package.json"), {
+      name: "@repo/worker",
+      private: true,
+      type: "module",
+      dependencies: {
+        libretto: currentLibrettoManifest.version,
+      },
+    });
+    writeFileSync(
+      entryPoint,
+      [
+        'import { claimSmsOtp, workflow } from "libretto";',
+        "",
+        "export const otpWorkflow = workflow(",
+        '  "otpWorkflow",',
+        "  async () => {",
+        '    const claim = await claimSmsOtp({ phoneNumberLabel: "test" });',
+        "    return { claimId: claim.claimId };",
+        "  },",
+        ");",
+        "",
+      ].join("\n"),
+    );
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        json: {
+          success: true,
+          claim: {
+            claim_id: "claim-1",
+            status: "open",
+            phone_number: "+15551234567",
+            number_id: "number-1",
+            label: "test",
+            expires_at: new Date(Date.now() + 60_000).toISOString(),
+            code: null,
+          },
+          message: "ok",
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const deployPackage = trackDeployPackage(
+      await createHostedDeployPackage({
+        deploymentName: "hosted-auth-worker",
+        entryPoint,
+        sourceDir,
+      }),
+    );
+    const deployed = await rebundleDeployEntrypointToCjs({
+      deployPackage,
+      outfile,
+    });
+
+    await expect(
+      deployed.workflow_0?.run?.(
+        {},
+        {
+          __libretto: {
+            job: {
+              apiUrl: "https://api.hosted.test",
+              jobId: "job-1",
+              token: "hosted-job-token",
+            },
+          },
+        },
+      ),
+    ).resolves.toEqual({ claimId: "claim-1" });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.hosted.test/v1/smsOtp/claims/create",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "x-libretto-job-token": "hosted-job-token",
+        }),
+      }),
+    );
+  });
+
+  it("strips hosted runtime auth before invoking a legacy Libretto runtime", async () => {
+    const workspaceRoot = createWorkspaceRoot();
+    installFixtureLibretto({
+      runtimeAuth: false,
+      version: "0.6.43",
+      workspaceRoot,
+    });
+    const sourceDir = join(workspaceRoot, "apps", "worker");
+    const entryPoint = join(sourceDir, "src", "workflow.ts");
+    const outfile = join(workspaceRoot, "legacy-deployment.cjs");
+
+    mkdirSync(join(sourceDir, "src"), { recursive: true });
+    writeJson(join(sourceDir, "package.json"), {
+      name: "@repo/worker",
+      private: true,
+      type: "module",
+      dependencies: { libretto: "0.6.43" },
+    });
+    writeFileSync(
+      entryPoint,
+      [
+        'import { workflow } from "libretto";',
+        "",
+        'export const strictWorkflow = workflow("strictWorkflow", {',
+        "  strictInput: true,",
+        "  handler: async (_ctx, input) => ({",
+        "    value: input.value,",
+        '    hasRuntime: Object.hasOwn(input, "__libretto"),',
+        "  }),",
+        "});",
+        "",
+        'export const schemaLessWorkflow = workflow("schemaLessWorkflow", async (_ctx, input) => ({',
+        '  hasRuntime: Object.hasOwn(input, "__libretto"),',
+        "}));",
+        "",
+      ].join("\n"),
+    );
+
+    const deployPackage = trackDeployPackage(
+      await createHostedDeployPackage({
+        deploymentName: "legacy-worker",
+        entryPoint,
+        sourceDir,
+      }),
+    );
+    const deployed = await rebundleDeployEntrypointToCjs({
+      deployPackage,
+      outfile,
+    });
+    const workflowExport = (name: string) => {
+      const index = deployPackage.workflows.findIndex(
+        (workflow) => workflow.name === name,
+      );
+      return deployed[`workflow_${index}`];
+    };
+    const hostedInput = {
+      value: "accepted",
+      __libretto: {
+        job: {
+          apiUrl: "https://api.hosted.test",
+          jobId: "job-1",
+          token: "hosted-job-token",
+        },
+      },
+    };
+
+    await expect(
+      workflowExport("strictWorkflow")?.run?.({}, hostedInput),
+    ).resolves.toEqual({ value: "accepted", hasRuntime: false });
+    await expect(
+      workflowExport("schemaLessWorkflow")?.run?.({}, hostedInput),
+    ).resolves.toEqual({ hasRuntime: false });
+  });
+
+  it("forwards hosted runtime auth to released Libretto 0.6.44", async () => {
+    const workspaceRoot = createWorkspaceRoot();
+    installFixtureLibretto({
+      runtimeAuth: true,
+      version: "0.6.44",
+      workspaceRoot,
+    });
+    const sourceDir = join(workspaceRoot, "apps", "worker");
+    const entryPoint = join(sourceDir, "src", "workflow.ts");
+    const outfile = join(workspaceRoot, "released-auth-deployment.cjs");
+
+    mkdirSync(join(sourceDir, "src"), { recursive: true });
+    writeJson(join(sourceDir, "package.json"), {
+      name: "@repo/worker",
+      private: true,
+      type: "module",
+      dependencies: { libretto: "0.6.44" },
+    });
+    writeFileSync(
+      entryPoint,
+      [
+        'import { workflow } from "libretto";',
+        "",
+        'export const authWorkflow = workflow("authWorkflow", async (_ctx, input, runtime) => ({',
+        '  hasRuntimeInput: Object.hasOwn(input, "__libretto"),',
+        "  token: runtime?.job?.token,",
+        "}));",
+        "",
+      ].join("\n"),
+    );
+
+    const deployPackage = trackDeployPackage(
+      await createHostedDeployPackage({
+        deploymentName: "released-auth-worker",
+        entryPoint,
+        sourceDir,
+      }),
+    );
+    const deployed = await rebundleDeployEntrypointToCjs({
+      deployPackage,
+      outfile,
+    });
+
+    await expect(
+      deployed.workflow_0?.run?.(
+        {},
+        { __libretto: { job: { token: "hosted-job-token" } } },
+      ),
+    ).resolves.toEqual({
+      hasRuntimeInput: false,
+      token: "hosted-job-token",
+    });
+  });
+
+  it("rejects externalizing the deployment-selected Libretto", async () => {
+    const workspaceRoot = createWorkspaceRoot();
+    const sourceDir = join(workspaceRoot, "apps", "worker");
+    mkdirSync(sourceDir, { recursive: true });
+    writeJson(join(sourceDir, "package.json"), {
+      name: "@repo/worker",
+      private: true,
+      dependencies: { libretto: currentLibrettoManifest.version },
+    });
+
+    await expect(
+      createHostedDeployPackage({
+        additionalExternals: ["libretto"],
+        deploymentName: "external-libretto-worker",
+        sourceDir,
+      }),
+    ).rejects.toThrow('Remove "libretto" from --external and deploy again.');
   });
 
   it("preserves workflow auth profile and browser launch metadata without site metadata", async () => {

@@ -16,6 +16,9 @@ import {
 } from "./runtime-auth.js";
 
 export const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
+export const LIBRETTO_WORKFLOW_RUNTIME_AUTH_BRAND = Symbol.for(
+  "libretto.workflow.runtime-auth",
+);
 
 export type LibrettoWorkflowContext = {
   session: string;
@@ -151,6 +154,7 @@ export class LibrettoWorkflow<
   OutputSchema extends z.ZodType = z.ZodType<unknown>,
 > {
   public readonly [LIBRETTO_WORKFLOW_BRAND] = true;
+  public readonly [LIBRETTO_WORKFLOW_RUNTIME_AUTH_BRAND] = true;
   public readonly name: string;
   // Optional so the legacy 2-arg `workflow(name, handler)` form still works
   // for deployments that were built before Zod schemas were a thing.
@@ -232,6 +236,7 @@ export class LibrettoWorkflow<
 
 export type ExportedLibrettoWorkflow = {
   readonly [LIBRETTO_WORKFLOW_BRAND]: true;
+  readonly [LIBRETTO_WORKFLOW_RUNTIME_AUTH_BRAND]?: true;
   readonly name: string;
   readonly inputSchema?: z.ZodType;
   readonly outputSchema?: z.ZodType;

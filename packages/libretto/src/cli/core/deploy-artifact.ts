@@ -128,6 +128,44 @@ function readPackageManifest(path: string): PackageManifest {
   return readJsonFile<PackageManifest>(path);
 }
 
+function resolveInstalledPackageVersion(
+  sourceDir: string,
+  packageName: string,
+): string | null {
+  let currentDir: string;
+  try {
+    const sourceRequire = createRequire(
+      join(resolve(sourceDir), "package.json"),
+    );
+    currentDir = dirname(sourceRequire.resolve(packageName));
+  } catch {
+    return null;
+  }
+
+  while (true) {
+    const manifestPath = join(currentDir, "package.json");
+    if (existsSync(manifestPath)) {
+      const manifest = readPackageManifest(manifestPath);
+      if (manifest.name === packageName) {
+        return manifest.version ?? null;
+      }
+    }
+    if (isRootPath(currentDir)) return null;
+    currentDir = dirname(currentDir);
+  }
+}
+
+function supportsHostedRuntimeAuth(version: string | null): boolean {
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/.exec(version ?? "");
+  if (!match) return false;
+  const [, major = "0", minor = "0", patch = "0"] = match;
+  return (
+    Number(major) > 0 ||
+    Number(minor) > 6 ||
+    (Number(minor) === 6 && Number(patch) >= 44)
+  );
+}
+
 function ensureSourcePackageManifest(sourceDir: string): PackageManifest {
   const pkgJsonPath = join(sourceDir, "package.json");
   if (!existsSync(pkgJsonPath)) {
@@ -1013,6 +1051,7 @@ function discoverBundledWorkflows(args: {
 function createBootstrapSource(args: {
   bundleBuffer: Buffer;
   deploymentName: string;
+  runtimeSupportsHostedAuth: boolean;
   workflows: readonly WorkflowDeployMetadata[];
 }): string {
   const bundleHash = createHash("sha256")
@@ -1046,7 +1085,12 @@ import { existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
-import { getWorkflowFromModuleExports, workflow } from "libretto";
+
+const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
+const LIBRETTO_WORKFLOW_RUNTIME_AUTH_BRAND = Symbol.for(
+  "libretto.workflow.runtime-auth",
+);
+const RUNTIME_SUPPORTS_HOSTED_AUTH = ${JSON.stringify(args.runtimeSupportsHostedAuth)};
 
 const BUNDLE_HASH = ${JSON.stringify(bundleHash)};
 const BUNDLE_GZIP_BASE64 = ${JSON.stringify(bundleBase64)};
@@ -1108,35 +1152,75 @@ function ensureBundleFile() {
   return BUNDLE_FILENAME;
 }
 
-function createWorkflowProxy(workflowName, metadata) {
-  const handler = async (ctx, input) => {
-    const impl = loadImplementation();
-    const target = getWorkflowFromModuleExports(impl, workflowName);
-    if (!target || typeof target.run !== "function") {
-      throw new Error(
-        \`Expected exported workflow "\${workflowName}" to be available in the bundled deployment implementation.\`,
-      );
-    }
-    return await target.run(ctx, input);
-  };
+function isWorkflow(value) {
+  return (
+    value &&
+    typeof value === "object" &&
+    value[LIBRETTO_WORKFLOW_BRAND] === true &&
+    typeof value.name === "string" &&
+    typeof value.run === "function"
+  );
+}
 
-  return workflow(workflowName, {
-    credentials: Array.isArray(metadata?.credentialNames)
+function findWorkflow(moduleExports, workflowName) {
+  for (const [exportName, value] of Object.entries(moduleExports)) {
+    if (
+      exportName === "workflows" &&
+      value &&
+      typeof value === "object" &&
+      !isWorkflow(value)
+    ) {
+      const match = Object.values(value).find(
+        (candidate) => isWorkflow(candidate) && candidate.name === workflowName,
+      );
+      if (match) return match;
+      continue;
+    }
+    if (isWorkflow(value) && value.name === workflowName) return value;
+  }
+  return null;
+}
+
+function withoutLibrettoRuntime(input) {
+  if (
+    !input ||
+    typeof input !== "object" ||
+    Array.isArray(input) ||
+    !Object.prototype.hasOwnProperty.call(input, "__libretto")
+  ) {
+    return input;
+  }
+  const { __libretto: _runtime, ...withoutRuntime } = input;
+  return withoutRuntime;
+}
+
+function createWorkflowProxy(workflowName, metadata) {
+  return {
+    [LIBRETTO_WORKFLOW_BRAND]: true,
+    name: workflowName,
+    credentialNames: Array.isArray(metadata?.credentialNames)
       ? metadata.credentialNames
       : [],
-    ...(metadata?.authProfileName
-      ? {
-          authProfile: {
-            name: metadata.authProfileName,
-            ...(typeof metadata.authProfileRefresh === "boolean" ? { refresh: metadata.authProfileRefresh } : {}),
-          },
-        }
-      : {}),
-    ...(typeof metadata?.startUrl === "string" ? { startUrl: metadata.startUrl } : {}),
-    ...(typeof metadata?.gpu === "boolean" ? { gpu: metadata.gpu } : {}),
-    ...(metadata?.viewport ? { viewport: metadata.viewport } : {}),
-    handler,
-  });
+    authProfileName: metadata?.authProfileName,
+    authProfileRefresh: metadata?.authProfileRefresh,
+    startUrl: metadata?.startUrl,
+    gpu: metadata?.gpu,
+    viewport: metadata?.viewport,
+    async run(ctx, input) {
+      const target = findWorkflow(loadImplementation(), workflowName);
+      if (!target) {
+        throw new Error(
+          \`Expected exported workflow "\${workflowName}" to be available in the bundled deployment implementation.\`,
+        );
+      }
+      const targetInput =
+        RUNTIME_SUPPORTS_HOSTED_AUTH ||
+        target[LIBRETTO_WORKFLOW_RUNTIME_AUTH_BRAND] === true
+          ? input
+          : withoutLibrettoRuntime(input);
+      return await target.run(ctx, targetInput);
+    },
+  };
 }
 
 ${exportLines}
@@ -1247,6 +1331,9 @@ async function writeBundledDeployEntrypoint(args: {
       createBootstrapSource({
         bundleBuffer: Buffer.from(bundledImplementation.contents),
         deploymentName: args.deploymentName,
+        runtimeSupportsHostedAuth: supportsHostedRuntimeAuth(
+          resolveInstalledPackageVersion(args.absSourceDir, "libretto"),
+        ),
         workflows,
       }),
     );
@@ -1280,13 +1367,19 @@ export async function createHostedDeployPackage(
   const absSourceDir = resolve(args.sourceDir);
   ensureSourcePackageManifest(absSourceDir);
 
+  const additionalExternals = [...new Set(args.additionalExternals ?? [])];
+  if (additionalExternals.includes("libretto")) {
+    throw new Error(
+      'Libretto must stay bundled with the workflow so Cloud runs the project\'s selected version. Remove "libretto" from --external and deploy again.',
+    );
+  }
+
   const absEntryPoint = resolveEntryPointPath(absSourceDir, args.entryPoint);
   const tempRoot = mkdtempSync(join(tmpdir(), "libretto-deploy-"));
   const outputDir = join(tempRoot, "deploy");
   mkdirSync(outputDir, { recursive: true });
   const librettoDependency = resolveLibrettoDependency(absSourceDir);
 
-  const additionalExternals = [...new Set(args.additionalExternals ?? [])];
   // These packages stay out of the implementation bundle. The generated
   // package.json carries them into deploy-time installation, and the deployed
   // code resolves them from node_modules.
