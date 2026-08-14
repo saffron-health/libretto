@@ -10,6 +10,8 @@ const comptimePlugin = await comptime();
 const blogPosts = await loadBlogPostInputs();
 const blogPostPaths = blogPosts.map((post) => `/blog/${post.slug}`);
 const dashboardPaths = dashboardPrerenderPaths;
+const stagingCloudApiUrl =
+  "https://browser-automations-staging-g2vofuk5ea-uc.a.run.app";
 
 function localDocsRedirectPlugin(): Plugin {
   return {
@@ -35,6 +37,14 @@ function localDocsRedirectPlugin(): Plugin {
 }
 
 export default defineConfig({
+  define:
+    process.env.VERCEL_ENV === "preview"
+      ? {
+          "import.meta.env.VITE_LIBRETTO_CLOUD_API_URL": JSON.stringify(
+            stagingCloudApiUrl,
+          ),
+        }
+      : undefined,
   plugins: [
     localDocsRedirectPlugin(),
     comptimePlugin,
