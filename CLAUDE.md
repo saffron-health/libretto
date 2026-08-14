@@ -10,6 +10,16 @@ pnpm prepare-release [patch|minor|major]
 
 This bumps the version, updates all SKILL.md files, syncs mirrors, validates parity, commits, pushes a `release-v*` branch, and opens a PR. The release CI workflow triggers automatically when the PR merges to `main`.
 
+## Publishing an Experimental Version
+
+Temporarily set a pre-release version in `packages/libretto/package.json` and replace its `workspace:` and `catalog:` dependency ranges with published ranges. Then run:
+
+```bash
+pnpm publish:experimental
+```
+
+Approve npm's browser passkey prompt and verify the exact version installs in a clean project. Do not commit the temporary manifest edits.
+
 ## Mirror System
 
 Skill files and READMEs are mirrored across multiple locations. **Do not hand-edit the mirrored copies.** Edit source files only, then sync.
