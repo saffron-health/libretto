@@ -16,6 +16,7 @@ import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 import { build } from "esbuild";
+import { z } from "zod";
 import {
   getWorkflowFromModuleExports,
   getWorkflowsFromModuleExports,
@@ -59,6 +60,8 @@ type HostedDeployPackage = {
 export type WorkflowDeployMetadata = {
   name: string;
   credentialNames: string[];
+  inputSchema?: unknown;
+  outputSchema?: unknown;
   authProfileName?: string;
   authProfileRefresh?: boolean;
   startUrl?: string;
@@ -869,6 +872,7 @@ function createDiscoveryLibrettoModule(
       workflowsByName.set(name, {
         name,
         ...extractDiscoveryCredentialMetadata(definitionOrHandler),
+        ...extractDiscoverySchemaMetadata(name, definitionOrHandler),
         ...extractDiscoveryAuthProfileMetadata(definitionOrHandler),
         ...extractDiscoveryLaunchMetadata(definitionOrHandler),
       });
@@ -893,6 +897,43 @@ function createDiscoveryLibrettoModule(
       return createExternalDiscoveryStub();
     },
   });
+}
+
+function extractDiscoverySchemaMetadata(
+  workflowName: string,
+  definitionOrHandler: unknown,
+): Pick<WorkflowDeployMetadata, "inputSchema" | "outputSchema"> {
+  if (!definitionOrHandler || typeof definitionOrHandler !== "object") {
+    return {};
+  }
+
+  const definition = definitionOrHandler as {
+    input?: unknown;
+    output?: unknown;
+  };
+  const metadata: Pick<
+    WorkflowDeployMetadata,
+    "inputSchema" | "outputSchema"
+  > = {};
+
+  for (const [definitionKey, metadataKey] of [
+    ["input", "inputSchema"],
+    ["output", "outputSchema"],
+  ] as const) {
+    const schema = definition[definitionKey];
+    if (!schema) continue;
+
+    try {
+      metadata[metadataKey] = z.toJSONSchema(schema as z.ZodType);
+    } catch (error) {
+      console.warn(
+        `Failed to serialize ${metadataKey} for workflow "${workflowName}":`,
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+
+  return metadata;
 }
 
 function extractDiscoveryLaunchMetadata(

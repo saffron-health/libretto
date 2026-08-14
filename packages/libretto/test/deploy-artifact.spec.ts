@@ -86,6 +86,10 @@ describe("createHostedDeployPackage", () => {
       join(nodeModulesDir, "libretto"),
       "dir",
     );
+    const zodPackageJsonPath = require.resolve("zod/package.json", {
+      paths: [currentLibrettoPackageDir],
+    });
+    symlinkSync(dirname(zodPackageJsonPath), join(nodeModulesDir, "zod"), "dir");
     for (const packageName of Object.keys(expectedRuntimeExternalDependencies)) {
       const packageJsonPath = require.resolve(`${packageName}/package.json`, {
         paths: [currentLibrettoPackageDir],
@@ -826,6 +830,80 @@ describe("createHostedDeployPackage", () => {
     );
     expect(bundle).not.toContain("authProfileSites");
     expect(bundle).not.toContain("sites:");
+  });
+
+  it("serializes workflow schemas into deployment metadata", async () => {
+    const workspaceRoot = createWorkspaceRoot();
+    const sourceDir = join(workspaceRoot, "apps", "worker");
+    const entryPoint = join(sourceDir, "src", "workflow.ts");
+
+    mkdirSync(join(sourceDir, "src"), { recursive: true });
+
+    writeJson(join(sourceDir, "package.json"), {
+      name: "@repo/worker",
+      private: true,
+      type: "module",
+      dependencies: {
+        libretto: currentLibrettoManifest.version,
+        zod: currentLibrettoManifest.dependencies?.zod,
+      },
+    });
+
+    writeFileSync(
+      entryPoint,
+      [
+        'import { workflow } from "libretto";',
+        'import { z } from "zod";',
+        "",
+        "export const testWorkflow = workflow(",
+        '  "testWorkflow",',
+        "  {",
+        "    input: z.object({ phone: z.string().min(1) }),",
+        "    output: z.object({ accepted: z.boolean() }),",
+        "  },",
+        "  async (_ctx, input) => ({ accepted: input.phone.length > 0 }),",
+        ");",
+        "",
+      ].join("\n"),
+    );
+
+    const deployPackage = trackDeployPackage(
+      await createHostedDeployPackage({
+        deploymentName: "schema-worker",
+        entryPoint,
+        sourceDir,
+      }),
+    );
+    const deployMetadata = JSON.parse(
+      readFileSync(
+        join(deployPackage.outputDir, ".libretto-workflows.json"),
+        "utf8",
+      ),
+    ) as {
+      workflows: Array<{
+        inputSchema?: unknown;
+        outputSchema?: unknown;
+      }>;
+    };
+
+    expect(deployMetadata.workflows[0]?.inputSchema).toEqual(
+      expect.objectContaining({
+        type: "object",
+        properties: {
+          phone: { type: "string", minLength: 1 },
+        },
+        required: ["phone"],
+      }),
+    );
+    expect(deployMetadata.workflows[0]?.outputSchema).toEqual(
+      expect.objectContaining({
+        type: "object",
+        properties: {
+          accepted: { type: "boolean" },
+        },
+        required: ["accepted"],
+      }),
+    );
   });
 
   it("vendors the current libretto package when the source manifest uses a local-only libretto spec", async () => {
