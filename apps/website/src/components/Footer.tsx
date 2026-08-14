@@ -43,9 +43,11 @@ export function Footer() {
       <div className="mx-auto max-w-[800px] px-8">
         {/* Row 1: copyright + sitemap */}
         <div className="flex items-start justify-between gap-8">
-          <Text size="xs" className="text-muted/50">
-            © {new Date().getFullYear()} Saffron Health
-          </Text>
+          <div>
+            <Text size="xs" className="text-muted/50">
+              © {new Date().getFullYear()} Saffron Health
+            </Text>
+          </div>
           <div className="flex flex-wrap justify-end gap-x-6 gap-y-2">
             <a href="/cli" className={linkClass} data-fathom-event="Footer cli click">
               CLI

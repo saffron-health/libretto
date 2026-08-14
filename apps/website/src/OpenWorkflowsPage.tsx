@@ -13,9 +13,9 @@ import {
   type CloudSession,
 } from "./cloudApi";
 import { withReturnTo } from "./authRedirect";
-import { Prism } from "./prism";
+import { SourceBrowser } from "./SourceBrowser";
 
-export type MarketplaceWorkflowSummary = {
+export type OpenWorkflowSummary = {
   id: string;
   workflow_name: string;
   description: string | null;
@@ -27,7 +27,7 @@ export type MarketplaceWorkflowSummary = {
   updated_at: string;
 };
 
-type MarketplaceWorkflowDetail = MarketplaceWorkflowSummary & {
+type OpenWorkflowDetail = OpenWorkflowSummary & {
   files: Array<{ file_name: string; code: string }>;
 };
 
@@ -43,9 +43,6 @@ type WorkflowBuildStatus = {
   error: string | null;
 };
 
-const CODE_TOKEN_CLASSES =
-  "font-mono text-[13px] leading-6 text-ink [&_.token.boolean]:text-[#79c0ff] [&_.token.builtin]:text-[#ffa657] [&_.token.class-name]:text-[#ffa657] [&_.token.comment]:text-[#8b949e] [&_.token.function]:text-[#d2a8ff] [&_.token.keyword]:text-[#ff7b72] [&_.token.number]:text-[#79c0ff] [&_.token.operator]:text-[#ff7b72] [&_.token.property]:text-[#79c0ff] [&_.token.punctuation]:text-[#c9d1d9] [&_.token.string]:text-[#a5d6ff] [&_.token.variable]:text-[#ffa657]";
-
 function pageShell(children: React.ReactNode) {
   return (
     <div className="crt-page flex min-h-screen flex-col bg-bg text-ink">
@@ -59,7 +56,7 @@ function pageShell(children: React.ReactNode) {
 }
 
 function matchesQuery(
-  workflow: MarketplaceWorkflowSummary,
+  workflow: OpenWorkflowSummary,
   query: string,
 ): boolean {
   const needle = query.trim().toLowerCase();
@@ -79,19 +76,6 @@ function matchesQuery(
     .every((part) => haystack.includes(part));
 }
 
-function highlightCode(fileName: string, code: string): string {
-  if (/\.json$/iu.test(fileName) && Prism.languages.json) {
-    return Prism.highlight(code, Prism.languages.json, "json");
-  }
-  if (/\.[cm]?[tj]sx?$/iu.test(fileName) && Prism.languages.typescript) {
-    return Prism.highlight(code, Prism.languages.typescript, "typescript");
-  }
-  return code
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
-}
-
 function buildCliSetupPrompt(args: {
   workflowName: string;
   codeUrl: string;
@@ -103,15 +87,15 @@ function buildCliSetupPrompt(args: {
   ].join("\n");
 }
 
-export function MarketplacePage() {
+export function OpenWorkflowsPage() {
   const [workflows, setWorkflows] = useState<
-    MarketplaceWorkflowSummary[] | null
+    OpenWorkflowSummary[] | null
   >(null);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    publicCloudGet<{ workflows: MarketplaceWorkflowSummary[] }>("/marketplace")
+    publicCloudGet<{ workflows: OpenWorkflowSummary[] }>("/open-workflows")
       .then((result) => setWorkflows(result.workflows))
       .catch((reason) =>
         setError(
@@ -131,24 +115,17 @@ export function MarketplacePage() {
     <>
       <header className="mb-10 max-w-2xl pt-4">
         <Text
-          as="p"
-          size="xs"
-          className="mb-4 uppercase tracking-[0.18em] text-accent"
-        >
-          Libretto Marketplace
-        </Text>
-        <Text
           as="h1"
           size="5xl"
           style="serif"
           wrap="balance"
           className="font-[300] leading-[1.05] tracking-[-0.035em] text-ink"
         >
-          Reusable browser workflows.
+          Open source workflows
         </Text>
         <Text as="p" size="md" className="mt-5 max-w-xl leading-7 text-muted">
-          Browse public workflows, connect your secrets, and deploy a private
-          copy to your Libretto account.
+          Shared workflow source you can inspect, connect secrets to, and deploy
+          as a private copy in your account.
         </Text>
       </header>
 
@@ -187,7 +164,7 @@ export function MarketplacePage() {
       )}
       {workflows?.length === 0 && (
         <p className="rounded-lg border border-rule bg-panel p-8 text-muted">
-          No public workflows have been shared yet.
+          No workflows yet.
         </p>
       )}
       {workflows && workflows.length > 0 && filtered.length === 0 && (
@@ -200,7 +177,7 @@ export function MarketplacePage() {
         {filtered.map((workflow) => (
           <a
             key={workflow.id}
-            href={`/marketplace/${encodeURIComponent(workflow.id)}`}
+            href={`/open-workflows/${encodeURIComponent(workflow.id)}`}
             className="group flex flex-col rounded-lg border border-rule bg-panel p-5 text-ink no-underline transition hover:border-accent/35 hover:bg-panel-hi"
           >
             <div className="flex items-start justify-between gap-4">
@@ -240,66 +217,8 @@ export function MarketplacePage() {
   );
 }
 
-function preferredSourceFile(
-  files: Array<{ file_name: string; code: string }>,
-): string {
-  const preferred =
-    files.find((file) => /^index\.[cm]?[tj]sx?$/iu.test(file.file_name)) ??
-    files.find((file) => /\.[cm]?[tj]sx?$/iu.test(file.file_name)) ??
-    files[0];
-  return preferred?.file_name ?? "";
-}
-
-function SourceBrowser({
-  files,
-}: {
-  files: Array<{ file_name: string; code: string }>;
-}) {
-  const [activeFile, setActiveFile] = useState(() => preferredSourceFile(files));
-  const active = files.find((file) => file.file_name === activeFile) ?? files[0];
-
-  if (!active) return null;
-
-  return (
-    <div className="overflow-hidden rounded-lg border border-rule bg-panel shadow-[0_0_24px_rgba(18,206,65,0.05)]">
-      <div className="flex flex-col lg:grid lg:min-h-[440px] lg:grid-cols-[180px_minmax(0,1fr)]">
-        <nav
-          aria-label="Source files"
-          className="flex gap-1 overflow-x-auto border-b border-rule bg-black/25 p-2 [scrollbar-width:none] lg:flex-col lg:gap-0.5 lg:overflow-visible lg:border-r lg:border-b-0 [&::-webkit-scrollbar]:hidden"
-        >
-          {files.map((file) => {
-            const selected = file.file_name === active.file_name;
-            return (
-              <button
-                key={file.file_name}
-                type="button"
-                onClick={() => setActiveFile(file.file_name)}
-                className={`shrink-0 rounded-md px-3 py-1.5 text-left font-mono text-xs transition lg:w-full lg:py-2 ${
-                  selected
-                    ? "bg-accent/10 text-accent-bright shadow-[inset_0_0_0_1px_rgba(18,206,65,0.18)]"
-                    : "text-muted hover:bg-white/4 hover:text-ink"
-                }`}
-              >
-                <span className="truncate">{file.file_name}</span>
-              </button>
-            );
-          })}
-        </nav>
-        <pre className="max-h-[min(60vh,28rem)] overflow-auto bg-[#0f120f] p-4 lg:max-h-none [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]">
-          <code
-            className={CODE_TOKEN_CLASSES}
-            dangerouslySetInnerHTML={{
-              __html: highlightCode(active.file_name, active.code),
-            }}
-          />
-        </pre>
-      </div>
-    </div>
-  );
-}
-
-export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
-  const [workflow, setWorkflow] = useState<MarketplaceWorkflowDetail | null>(
+export function OpenWorkflowPage({ shareId }: { shareId: string }) {
+  const [workflow, setWorkflow] = useState<OpenWorkflowDetail | null>(
     null,
   );
   const [session, setSession] = useState<CloudSession | null>(null);
@@ -314,8 +233,8 @@ export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
   const [build, setBuild] = useState<WorkflowBuildStatus | null>(null);
 
   useEffect(() => {
-    publicCloudGet<MarketplaceWorkflowDetail>(
-      `/marketplace/${encodeURIComponent(shareId)}/data`,
+    publicCloudGet<OpenWorkflowDetail>(
+      `/open-workflows/${encodeURIComponent(shareId)}/data`,
     )
       .then(setWorkflow)
       .catch((reason) =>
@@ -394,7 +313,7 @@ export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
         build_id: string;
         status: "deploying";
         workflow_name: string;
-      }>("/v1/marketplace/import", {
+      }>("/v1/openWorkflows/import", {
         share_id: workflow.id,
         credential_ids: credentialIds,
         auto_repair: options.autoRepair,
@@ -418,7 +337,7 @@ export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
   }
 
   function startUsingWorkflow() {
-    const returnTo = `/marketplace/${encodeURIComponent(shareId)}`;
+    const returnTo = `/open-workflows/${encodeURIComponent(shareId)}`;
     if (!session) {
       window.location.assign(withReturnTo("/signin", returnTo));
       return;
@@ -438,7 +357,7 @@ export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
   const cliPrompt = workflow
     ? buildCliSetupPrompt({
         workflowName: workflow.workflow_name,
-        codeUrl: `${cloudApiUrl}/marketplace/${encodeURIComponent(workflow.id)}/code`,
+        codeUrl: `${cloudApiUrl}/open-workflows/${encodeURIComponent(workflow.id)}/code`,
       })
     : "";
 
@@ -458,10 +377,10 @@ export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
   return pageShell(
     <>
       <a
-        href="/marketplace"
+        href="/open-workflows"
         className="inline-flex pt-4 font-mono text-xs text-muted no-underline transition hover:text-ink"
       >
-        ← Marketplace
+        ← Open source workflows
       </a>
 
       <header className="mt-8">
@@ -624,7 +543,7 @@ export function MarketplaceWorkflowPage({ shareId }: { shareId: string }) {
                 <button
                   type="button"
                   className="mt-3 inline-flex h-9 w-full shrink-0 cursor-pointer items-center justify-center rounded-lg border border-rule bg-transparent font-mono text-xs font-medium tracking-[0.06em] text-muted uppercase transition hover:border-accent/40 hover:bg-white/[0.04] hover:text-accent-bright focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(18,206,65,0.25)]"
-                  data-fathom-event="Marketplace copy CLI prompt"
+                  data-fathom-event="Open workflows copy CLI prompt"
                   onClick={() => {
                     void navigator.clipboard
                       .writeText(cliPrompt)

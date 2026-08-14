@@ -10,7 +10,6 @@ type TenantSettingsResponse = {
 };
 
 type TenantSettingsInput = {
-  code_sharing_enabled?: boolean;
   disable_job_failure_notifications?: boolean;
 };
 
@@ -62,9 +61,6 @@ export const setSettingsCommand = SimpleCLI.command({
     SimpleCLI.input({
       positionals: [],
       named: {
-        codeSharing: SimpleCLI.option(settingState.optional(), {
-          help: "Set tenant code sharing: enabled or disabled",
-        }),
         jobFailureNotifications: SimpleCLI.option(settingState.optional(), {
           help: "Set hosted job failure notification emails: enabled or disabled",
         }),
@@ -74,9 +70,6 @@ export const setSettingsCommand = SimpleCLI.command({
   .use(withCloudApiKey("manage Libretto Cloud settings"))
   .handle(async ({ input, ctx }) => {
     const updates: TenantSettingsInput = {};
-    if (input.codeSharing !== undefined) {
-      updates.code_sharing_enabled = toBoolean(input.codeSharing);
-    }
     if (input.jobFailureNotifications !== undefined) {
       updates.disable_job_failure_notifications = !toBoolean(
         input.jobFailureNotifications,
@@ -85,7 +78,7 @@ export const setSettingsCommand = SimpleCLI.command({
 
     if (Object.keys(updates).length === 0) {
       throw new Error(
-        "No settings provided. Use one or more flags, for example `libretto cloud settings set --code-sharing enabled --job-failure-notifications disabled`.",
+        "No settings provided. Use one or more flags, for example `libretto cloud settings set --job-failure-notifications disabled`.",
       );
     }
 

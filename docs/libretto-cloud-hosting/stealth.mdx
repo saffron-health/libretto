@@ -45,6 +45,18 @@ Supported fields:
 
 For recurring workflows, pass the same object to `residential_proxy` on `/v1/schedules/create` or `/v1/schedules/update`. To clear a schedule's configured proxy location, set `residential_proxy` to `null` on `/v1/schedules/update`.
 
+## Disable default proxy (direct egress)
+
+Some sites fail through Kernel's default residential stealth proxy with errors like `ERR_TUNNEL_CONNECTION_FAILED`. For those targets, pass `disable_default_proxy: true` when you create a job, browser session, or schedule. Libretto Cloud flips the Kernel session to direct egress before any `start_url` navigation.
+
+`disable_default_proxy` is Kernel-only and mutually exclusive with `residential_proxy`.
+
+```bash theme={null}
+npx libretto cloud jobs create check-eligibility \
+  --start-url 'https://example.com/dashboard' \
+  --disable-default-proxy
+```
+
 ## Workflow behavior
 
 On Libretto Cloud, if a workflow reaches a CAPTCHA, Cloudflare check, or similar interstitial, wait up to 2 minutes before treating it as blocked. That gives the hosted browser time to finish the provider-side solve and continue to the page your workflow expects.

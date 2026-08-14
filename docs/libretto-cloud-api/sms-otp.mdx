@@ -1,0 +1,101 @@
+---
+title: SMS OTP
+"og:image": "https://libretto.sh/docs/og/libretto-cloud-api/sms-otp.png"
+---
+
+> Receive portal SMS one-time codes through tenant-owned Libretto Cloud inbox numbers, then wait for the code inside a workflow.
+
+SMS OTP is for portals that text a code to a phone number. Prefer authenticator TOTP (`*_totp_secret`) when the portal supports it.
+
+## How it works
+
+1. Provision an inbox number into your tenant pool (CLI or dashboard).
+2. Register that full phone number (with country code, like `+15551234567`) as the MFA phone on the portal account.
+3. In the workflow: `await claimSmsOtp(...)` to lock an inbox, click send-code, then `await otp.wait()` for the code.
+
+Use one phone number per portal (or per portal login). Do not run concurrent SMS OTP claims on the same inbox number. A claim locks the inbox for up to 5 minutes; pulling the code unlocks it, and a new claim can take over after the lock expires.
+
+## Configure numbers (outside workflows)
+
+```bash
+libretto cloud sms-numbers provision --label uhc
+libretto cloud sms-numbers list
+```
+
+Dashboard: **Phone numbers**. Copy the phone number (with country code) and set it on the portal MFA settings.
+
+### POST `/v1/smsNumbers/provision`
+
+Requires `x-api-key`.
+
+Request fields:
+
+- `label` (optional): portal label such as `uhc`
+- `country` (optional): two-letter country code
+- `area_code` (optional): preferred area code
+
+### POST `/v1/smsNumbers/list`
+
+Lists pool numbers. Pass `include_released: true` to include released rows.
+
+### POST `/v1/smsNumbers/update`
+
+Update a number's `label`.
+
+### POST `/v1/smsNumbers/release`
+
+Release the number and remove it from your tenant pool. Irreversible.
+
+## Wait for a code in a workflow
+
+`claimSmsOtp` first locks the inbox (exclusive claim), then returns a handle. Always await the claim before clicking send-code so the lock is held when the SMS arrives. Call `otp.wait()` after send-code.
+
+Full runtime API: [`claimSmsOtp`](/reference/runtime/sms-otp).
+
+Pass one of `phoneNumber`, `phoneNumberId`, or `phoneNumberLabel` to select the inbox.
+
+Auth is automatic — do not put an API key in workflow source:
+
+- Local: set `LIBRETTO_API_KEY` (same key as deploy/CLI)
+- Hosted Cloud: dispatch injects a short-lived job token; `claimSmsOtp` picks it up with no extra args
+
+```typescript
+import { claimSmsOtp, workflow } from "libretto";
+
+export default workflow("portal-login", {
+  credentials: ["username", "password"],
+  async handler(ctx, input) {
+    // ... fill username/password, then:
+    const otp = await claimSmsOtp({ phoneNumberLabel: "uhc" });
+    // Inbox is locked. otp.phoneNumber is the claimed number.
+
+    await ctx.page.click('button:has-text("Send code")');
+    const { code } = await otp.wait();
+    await ctx.page.fill('input[name="otp"]', code);
+  },
+});
+```
+
+`claimSmsOtp`:
+
+1. `POST /v1/smsOtp/claims/create` — exclusive open claim on the inbox (returns after lock)
+2. `otp.wait()` polls `POST /v1/smsOtp/claims/get` until fulfilled, then consumes the code once
+
+`timeoutMs` (default 120s) is how long to poll after the claim opens. Claim TTL is derived from it (clamped to 30–300 seconds).
+
+### Claim routes
+
+Accept `x-api-key` or `x-libretto-job-token` (hosted jobs inject the job token automatically).
+
+**Create** — `number_id`, `label`, or `phone_number`; optional `ttl_seconds` (30–300, default 300). `claimSmsOtp` sets `ttl_seconds` from `timeoutMs` and does not expose a separate TTL option.
+
+**Get** — `claim_id`; optional `consume` (default true). Returns `code` once when fulfilled.
+
+**Expire** — `claim_id`. Marks an open claim expired so the inbox lock is freed (used when `otp.wait()` times out).
+
+## Isolation rules
+
+- Numbers are tenant-scoped (RLS).
+- Inbound SMS is matched to the inbox number that received it.
+- At most one open claim per number (HTTP 409 if busy). Create expires stale open locks (≥5 minutes) before taking the lock.
+- Codes are encrypted at rest and single-consume (returned once, then cleared).

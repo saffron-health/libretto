@@ -6,12 +6,16 @@ import { Navbar } from "./components/Navbar";
 import { Panel } from "./components/Panel";
 import { SectionDivider } from "./components/SectionDivider";
 import { Text } from "./components/Text";
+import { CanvasAsciihedron } from "./components/CanvasAsciihedron";
 
 interface Example {
   site: string;
   siteTone: string;
   task: string;
 }
+
+const CHROME_EXTENSION_URL =
+  "https://chromewebstore.google.com/detail/libretto/ddjagimknfjnkaefgfjpcnanflaipbmn";
 
 const oneTimeExamples: Example[] = [
   {
@@ -59,37 +63,6 @@ const repeatableExamples: Example[] = [
   },
 ];
 
-function SparkIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="size-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-    >
-      <path d="M12 2.5c.7 5.5 4 8.8 9.5 9.5-5.5.7-8.8 4-9.5 9.5-.7-5.5-4-8.8-9.5-9.5 5.5-.7 8.8-4 9.5-9.5Z" />
-    </svg>
-  );
-}
-
-function CloudIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="size-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-    >
-      <path d="M7.2 18.5h10.1a4.2 4.2 0 0 0 .7-8.3A6.2 6.2 0 0 0 6.1 8.8a4.9 4.9 0 0 0 1.1 9.7Z" />
-      <path d="m9.4 14.1 2.1 2 3.6-4" />
-    </svg>
-  );
-}
-
 function ArrowIcon() {
   return (
     <svg
@@ -107,7 +80,7 @@ function ArrowIcon() {
 
 function BrowserDemo() {
   return (
-    <div className="relative mx-auto mt-16 max-w-[980px]">
+    <div className="relative w-full">
       <div className="absolute -inset-10 -z-10 bg-[radial-gradient(circle_at_center,color-mix(in_oklch,var(--color-green-9)_12%,transparent),transparent_68%)]" />
       <div className="overflow-hidden rounded-xl border border-rule bg-panel shadow-[0_30px_100px_rgba(0,0,0,0.45)]">
         <div className="flex h-11 items-center gap-3 border-b border-rule bg-panel-hi/60 px-4">
@@ -121,8 +94,8 @@ function BrowserDemo() {
           </div>
           <div className="w-10" />
         </div>
-        <div className="grid min-h-[410px] md:grid-cols-[1fr_350px]">
-          <div className="hidden border-r border-rule bg-[linear-gradient(135deg,var(--color-gray-2),var(--color-gray-1))] p-8 md:block">
+        <div className="grid min-h-[410px] 2xl:grid-cols-[1fr_350px]">
+          <div className="hidden border-r border-rule bg-[linear-gradient(135deg,var(--color-gray-2),var(--color-gray-1))] p-8 2xl:block">
             <div className="mb-8 h-5 w-32 rounded bg-muted/10" />
             <div className="grid grid-cols-3 gap-4">
               {["New leads", "Open deals", "Tasks"].map((label, index) => (
@@ -239,31 +212,21 @@ function ExampleGrid({ examples }: { examples: Example[] }) {
 }
 
 function StorySection({
-  number,
   kicker,
   title,
   description,
-  icon,
   examples,
   children,
 }: {
-  number: string;
   kicker: string;
   title: string;
   description: string;
-  icon: ReactNode;
   examples: Example[];
   children: ReactNode;
 }) {
   return (
     <section className="grid gap-12 px-8 py-20 lg:grid-cols-[0.78fr_1.22fr] lg:gap-20 lg:px-16 lg:py-28">
       <div>
-        <div className="mb-8 flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-full border border-accent/25 bg-green-3/25 text-accent-bright">
-            {icon}
-          </span>
-          <span className="text-xs text-muted/45">{number}</span>
-        </div>
         <Kicker className="mb-4 text-sm text-accent">{kicker}</Kicker>
         <Text
           as="h2"
@@ -289,41 +252,49 @@ function StorySection({
 
 function Hero() {
   return (
-    <section className="overflow-hidden px-8 pb-20 pt-24">
-      <div className="mx-auto max-w-[1100px] text-center">
-        <Kicker className="mb-6 text-sm text-accent">
-          // LIBRETTO FOR CHROME --
-        </Kicker>
-        <Text
-          as="h1"
-          size="5xl"
-          style="serif"
-          className="crt-glow mx-auto mb-7 max-w-[880px] font-[300] leading-[1.02] tracking-[-0.045em] text-ink [text-wrap:balance]"
-          htmlStyle={{ fontSize: "clamp(48px, 7.5vw, 92px)" }}
-        >
-          Automate your work in Chrome
-        </Text>
-        <Text
-          as="p"
-          size="lg"
-          className="mx-auto mb-9 max-w-[680px] leading-relaxed text-muted [text-wrap:balance]"
-        >
-          Automate a task in Chrome, then save it as a workflow you can run
-          anytime or put on a schedule—even when your computer is closed.
-        </Text>
-        <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <Button
-            href="/signin?mode=signup"
-            data-fathom-event="Chrome extension hero try click"
+    <section className="relative overflow-hidden px-6 pt-16 pb-20 md:px-8 md:pt-24 md:pb-28">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[620px] bg-[radial-gradient(ellipse_at_64%_28%,color-mix(in_oklch,var(--color-green-9)_11%,transparent),transparent_48%)]" />
+      <div className="pointer-events-none absolute inset-0 flex translate-y-6 items-center justify-center select-none max-md:translate-y-0 lg:justify-end lg:pr-[4%]">
+        <CanvasAsciihedron
+          className="h-[1200px] w-[1200px] min-h-[900px] min-w-[900px] max-h-[160vw] max-w-[160vw] shrink-0 text-ink lg:h-[1400px] lg:w-[1400px]"
+          showAnnotations={false}
+          objectScale={1.15}
+          baseOpacity={0.1}
+        />
+      </div>
+      <div className="relative mx-auto grid max-w-[1120px] items-center gap-14 lg:grid-cols-[0.92fr_1.08fr] lg:gap-20">
+        <div>
+          <Kicker className="mb-5">// LIBRETTO FOR CHROME --</Kicker>
+          <Text
+            as="h1"
+            size="5xl"
+            style="serif"
+            wrap="pretty"
+            className="crt-glow mb-6 max-w-[620px] tracking-[-0.045em] text-ink"
+            htmlStyle={{
+              fontWeight: 300,
+              fontSize: "clamp(42px, 6vw, 72px)",
+              lineHeight: 0.98,
+            }}
           >
-            Try Libretto
-          </Button>
-          <Button
-            href="#examples"
-            variant="secondary"
-            data-fathom-event="Chrome extension examples click"
+            Automate your work in Chrome
+          </Text>
+          <Text
+            as="p"
+            size="lg"
+            wrap="pretty"
+            className="mb-9 max-w-[560px] leading-relaxed text-muted"
           >
-            See what it can do ↓
+            Automate a task in Chrome, then save it as a workflow you can run
+            anytime or put on a schedule, even when your computer is closed.
+          </Text>
+          <Button
+            href={CHROME_EXTENSION_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-fathom-event="Chrome extension hero download click"
+          >
+            Get the extension
           </Button>
         </div>
         <BrowserDemo />
@@ -332,56 +303,9 @@ function Hero() {
   );
 }
 
-function HowItWorks() {
-  const steps = [
-    ["01", "Tell it", "Describe the result you want in plain English."],
-    [
-      "02",
-      "Watch it work",
-      "Libretto clicks, types, navigates, and gathers information for you.",
-    ],
-    [
-      "03",
-      "Run it again",
-      "Save any useful task and run it on demand or on a schedule.",
-    ],
-  ];
-  return (
-    <section className="px-8 py-20 lg:px-16 lg:py-24">
-      <Kicker className="mb-4 text-center text-sm text-accent">
-        // HOW IT WORKS --
-      </Kicker>
-      <Text
-        as="h2"
-        size="4xl"
-        style="serif"
-        className="mx-auto mb-14 max-w-[620px] text-center font-[300] tracking-[-0.035em] [text-wrap:balance]"
-      >
-        From request to done
-      </Text>
-      <div className="grid gap-px overflow-hidden rounded-lg border border-rule bg-rule md:grid-cols-3">
-        {steps.map(([number, title, body]) => (
-          <div key={number} className="bg-panel p-7">
-            <span className="text-[10px] text-accent">{number}</span>
-            <h3 className="mb-3 mt-10 font-serif text-2xl font-[300] text-ink">
-              {title}
-            </h3>
-            <Text as="p" size="sm" className="leading-relaxed text-muted">
-              {body}
-            </Text>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function CloudCallout() {
   return (
-    <div className="mt-8 flex gap-3 rounded-lg border border-accent/20 bg-green-3/20 p-4">
-      <span className="mt-0.5 text-accent">
-        <CloudIcon />
-      </span>
+    <div className="mt-8 rounded-lg border border-accent/20 bg-green-3/20 p-4">
       <Text as="p" size="xs" className="leading-relaxed text-muted">
         Workflows run securely in the cloud. Close your laptop and Libretto
         keeps going.
@@ -392,7 +316,7 @@ function CloudCallout() {
 
 function PrivacyStrip() {
   return (
-    <section className="grid gap-8 px-8 py-16 md:grid-cols-[1fr_1.4fr] md:items-center lg:px-16">
+    <section className="grid gap-8 px-8 py-16 md:grid-cols-[1fr_1.4fr] md:items-start lg:px-16">
       <div>
         <Kicker className="mb-3 text-sm text-accent">
           // YOU'RE IN CONTROL --
@@ -428,9 +352,6 @@ function PrivacyStrip() {
 function FinalCta() {
   return (
     <section className="px-8 py-24 text-center" id="get-started">
-      <div className="mx-auto mb-7 grid size-12 place-items-center rounded-full border border-accent/25 bg-green-3/20 text-accent-bright">
-        <SparkIcon />
-      </div>
       <Kicker className="mb-4 text-sm text-accent">
         // WHAT DO YOU WANT DONE? --
       </Kicker>
@@ -451,10 +372,12 @@ function FinalCta() {
         the steps for you.
       </Text>
       <Button
-        href="/signin?mode=signup"
-        data-fathom-event="Chrome extension final try click"
+        href={CHROME_EXTENSION_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-fathom-event="Chrome extension final download click"
       >
-        Try Libretto
+        Get the extension
       </Button>
     </section>
   );
@@ -472,11 +395,9 @@ export function ChromeExtensionPage() {
         >
           <SectionDivider />
           <StorySection
-            number="01 / 02"
             kicker="// GET A TASK DONE --"
             title="Ask once. Get it done."
             description="Tell the Libretto agent what you need in everyday language. It works across websites to complete the task while you focus on something else."
-            icon={<SparkIcon />}
             examples={oneTimeExamples}
           >
             <div className="mt-7 flex items-center gap-2 text-xs text-accent-bright">
@@ -486,17 +407,13 @@ export function ChromeExtensionPage() {
           </StorySection>
           <SectionDivider />
           <StorySection
-            number="02 / 02"
             kicker="// MAKE IT A WORKFLOW --"
             title="Save it once. Run it anytime."
             description="Turn any useful task into a dependable workflow. Run it with one click or choose a schedule and let Libretto take care of it in the cloud."
-            icon={<CloudIcon />}
             examples={repeatableExamples}
           >
             <CloudCallout />
           </StorySection>
-          <SectionDivider />
-          <HowItWorks />
           <SectionDivider />
           <PrivacyStrip />
           <SectionDivider />

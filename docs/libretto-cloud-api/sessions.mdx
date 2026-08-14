@@ -19,8 +19,11 @@ Request fields:
 - `viewport`: optional `{ width, height }` viewport
 - `headless`: optional boolean browser mode
 - `residential_proxy`: optional residential proxy location object
+- `disable_default_proxy`: optional boolean; Kernel only. Disables Kernel's default residential stealth proxy so traffic uses direct egress. Mutually exclusive with `residential_proxy`.
 
 Prefer `start_url` over navigating with Playwright immediately after connect. Use `residential_proxy` for location-sensitive sessions that need traffic to originate from a specific residential proxy country, US state, city, ZIP code, or ASN. See [Residential proxy locations](/libretto-cloud-hosting/stealth#residential-proxy-locations) for the supported fields and combination rules.
+
+Use `disable_default_proxy` when the default managed proxy cannot reach the target (for example `ERR_TUNNEL_CONNECTION_FAILED`). It cannot be combined with `residential_proxy`. When both `start_url` and `disable_default_proxy` are set, Libretto Cloud still opens `start_url` after switching to direct egress, so clients should treat the start URL as preloaded.
 
 Response fields:
 

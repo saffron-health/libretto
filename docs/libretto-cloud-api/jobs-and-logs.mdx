@@ -7,6 +7,36 @@ title: Jobs and logs
 
 All routes on this page require `x-api-key`.
 
+### Get the workflow output
+
+`POST /v1/jobs/create` starts a run and returns a `job_id`. It does not return the data the workflow collected.
+
+Whatever the handler `return`s is stored on the completed job as `result`. That object matches the workflow `output` schema.
+
+Poll `POST /v1/jobs/get` until the job finishes, then read `result`. A `job.completed` webhook delivers the same field. See [Webhooks](/libretto-cloud-api/webhooks).
+
+```bash
+curl -X POST "https://api.libretto.sh/v1/jobs/get" \
+  -H "x-api-key: $LIBRETTO_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "json": {
+      "id": "<job-id>"
+    }
+  }'
+```
+
+```json
+{
+  "job_id": "<job-id>",
+  "workflow": "scrape-page",
+  "status": "completed",
+  "result": {
+    "title": "Example Domain"
+  }
+}
+```
+
 ### Jobs
 
 #### POST `/v1/jobs/create`
@@ -27,12 +57,15 @@ Request fields:
 - `callback_secret`: optional callback secret
 - `skip_callbacks`: optional boolean
 - `residential_proxy`: optional residential proxy location object
+- `disable_default_proxy`: optional boolean; Kernel only. Disables Kernel's default residential stealth proxy so traffic uses direct egress. Mutually exclusive with `residential_proxy`. Use when sites fail with `ERR_TUNNEL_CONNECTION_FAILED` on the default proxy.
 
 If you set `callback_url`, you must also set `callback_secret`.
 
 Prefer declaring `startUrl`, `gpu`, and `viewport` on the workflow definition so they travel with the deploy artifact. Use the job-level fields when you need a one-off override, or until the hosted executor applies workflow launch metadata automatically.
 
 Use `residential_proxy` for location-sensitive runs that need traffic to originate from a specific residential proxy country, US state, city, ZIP code, or ASN. See [Residential proxy locations](/libretto-cloud-hosting/stealth#residential-proxy-locations) for the supported fields and combination rules.
+
+Use `disable_default_proxy` when the default managed proxy cannot reach the target (for example `ERR_TUNNEL_CONNECTION_FAILED`). It cannot be combined with `residential_proxy`.
 
 Callback delivery order:
 
@@ -48,6 +81,8 @@ Response fields:
 - `job_id`
 - `status`: always `running`
 - `message`
+
+This response does not include `result`. See [Get the workflow output](#get-the-workflow-output).
 
 #### POST `/v1/jobs/list`
 
@@ -94,7 +129,7 @@ Response fields:
 - `created_at`
 - `started_at`
 - `completed_at`
-- `result`
+- `result`: the workflow handler return value after the job completes. Matches `schemas.output`.
 - `error`
 - `mapped_stack`
 

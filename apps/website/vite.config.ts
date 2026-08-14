@@ -4,23 +4,12 @@ import tailwindcss from "@tailwindcss/vite";
 import { comptime } from "comptime.ts/vite";
 import { defineConfig, type Plugin } from "vite";
 import { loadBlogPostInputs } from "./scripts/blog-posts.ts";
+import { dashboardPrerenderPaths } from "./src/dashboardSections.ts";
 
 const comptimePlugin = await comptime();
 const blogPosts = await loadBlogPostInputs();
 const blogPostPaths = blogPosts.map((post) => `/blog/${post.slug}`);
-const dashboardPaths = [
-  "/dashboard",
-  "/dashboard/workflows",
-  "/dashboard/schedules",
-  "/dashboard/workflow_runs",
-  "/dashboard/browser_sessions",
-  "/dashboard/connected_repos",
-  "/dashboard/users",
-  "/dashboard/settings",
-  "/dashboard/secrets",
-  "/dashboard/api_keys",
-  "/dashboard/billing",
-];
+const dashboardPaths = dashboardPrerenderPaths;
 
 function localDocsRedirectPlugin(): Plugin {
   return {
@@ -55,7 +44,12 @@ export default defineConfig({
         enabled: true,
         crawlLinks: false,
       },
-      pages: [...blogPostPaths, ...dashboardPaths, "/marketplace"].map((path) => ({
+      pages: [
+        ...blogPostPaths,
+        ...dashboardPaths,
+        "/open-workflows",
+        "/hosted-workflows",
+      ].map((path) => ({
         path,
         prerender: { enabled: true },
       })),

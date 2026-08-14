@@ -1,5 +1,7 @@
 import { existsSync } from "node:fs";
 import { chmod, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -114,7 +116,7 @@ function expectedRootHelp(): string {
       pages  List open pages in the session
       session-mode  View or set the session access mode
       close  Close the browser
-      cloud <subcommand>  Deploy workflows and manage hosted Libretto
+      cloud <subcommand>  Deploy workflows and manage Libretto Cloud
       experiments  List or update Libretto experiment flags
       import-chrome-profiles  Fetch scoped auth state from a Chrome CDP session into a local profile
       exec  Execute Playwright TypeScript code
@@ -347,12 +349,10 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).toBe("");
   });
 
-  test("prints cloud group help with hosted commands", async ({
-    librettoCli,
-  }) => {
+  test("prints cloud group help", async ({ librettoCli }) => {
     const result = await librettoCli("help cloud");
     expect(result.stdout).toContain(
-      "Deploy workflows and manage hosted Libretto",
+      "Deploy workflows and manage Libretto Cloud",
     );
     expect(result.stdout).toContain("libretto cloud <subcommand>");
     expect(result.stdout).toContain("deploy");
@@ -361,8 +361,10 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("jobs");
     expect(result.stdout).toContain("schedules");
     expect(result.stdout).toContain("settings");
-    expect(result.stdout).toContain("share");
-    expect(result.stdout).toContain("sharing");
+    expect(result.stdout).toMatch(/\bshare\b/);
+    expect(result.stdout).toMatch(/\bunshare\b/);
+    expect(result.stdout).not.toMatch(/\bhost\b/);
+    expect(result.stdout).not.toMatch(/\bunhost\b/);
     expect(result.stderr).toBe("");
   });
 
@@ -378,6 +380,8 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("--start-url");
     expect(result.stdout).toContain("--gpu");
     expect(result.stdout).toContain("--viewport");
+    expect(result.stdout).toContain("--residential-proxy");
+    expect(result.stdout).toContain("--disable-default-proxy");
     expect(result.stderr).toBe("");
   });
 
@@ -390,6 +394,79 @@ describe("basic CLI subprocess behavior", () => {
       "LIBRETTO_API_KEY is required to create Libretto Cloud jobs.",
     );
     expect(result.stderr).toContain("libretto cloud auth api-key issue");
+  });
+
+  test("cloud jobs create rejects --disable-default-proxy with --residential-proxy", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli(
+      `cloud jobs create testWorkflow --disable-default-proxy --residential-proxy '{"country":"US"}'`,
+      { LIBRETTO_API_KEY: "test-key" },
+    );
+
+    expect(result.stderr).toContain(
+      "Cannot pass both --disable-default-proxy and --residential-proxy.",
+    );
+  });
+
+  test("cloud jobs create sends disable_default_proxy with start_url", async ({
+    librettoCli,
+  }) => {
+    const requests: Array<{ path: string; body: unknown }> = [];
+    const server = createServer(async (request, response) => {
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      const rawBody = Buffer.concat(chunks).toString("utf8");
+      requests.push({
+        path: request.url ?? "",
+        body: rawBody.length > 0 ? JSON.parse(rawBody) : null,
+      });
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(
+        JSON.stringify({
+          json: {
+            success: true,
+            job_id: "job-direct-egress",
+            status: "queued",
+            message: "Job queued.",
+          },
+        }),
+      );
+    });
+    await new Promise<void>((resolve) => {
+      server.listen(0, "127.0.0.1", () => resolve());
+    });
+    const address = server.address() as AddressInfo;
+    const apiUrl = `http://127.0.0.1:${address.port}`;
+
+    try {
+      const result = await librettoCli(
+        "cloud jobs create esnad-floating-tenders --start-url https://etendering.tenderboard.gov.om/product/publicDash --disable-default-proxy",
+        {
+          LIBRETTO_API_KEY: "test-key",
+          LIBRETTO_API_URL: apiUrl,
+        },
+      );
+
+      expect(result.stdout).toContain("Job created: job-direct-egress");
+      expect(requests).toHaveLength(1);
+      expect(requests[0]?.path).toBe("/v1/jobs/create");
+      expect(requests[0]?.body).toEqual({
+        json: {
+          workflow: "esnad-floating-tenders",
+          params: {},
+          start_url:
+            "https://etendering.tenderboard.gov.om/product/publicDash",
+          disable_default_proxy: true,
+        },
+      });
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      });
+    }
   });
 
   test("prints cloud schedules create help", async ({ librettoCli }) => {
@@ -405,6 +482,8 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stdout).toContain("--start-url");
     expect(result.stdout).toContain("--gpu");
     expect(result.stdout).toContain("--viewport");
+    expect(result.stdout).toContain("--residential-proxy");
+    expect(result.stdout).toContain("--disable-default-proxy");
     expect(result.stderr).toBe("");
   });
 
@@ -422,25 +501,17 @@ describe("basic CLI subprocess behavior", () => {
     expect(result.stderr).toContain("libretto cloud auth api-key issue");
   });
 
-  test("prints cloud share help", async ({ librettoCli }) => {
-    const result = await librettoCli("help cloud share");
-    expect(result.stdout).toContain(
-      "Share one hosted workflow's code publicly",
+  test("cloud schedules create rejects --disable-default-proxy with --residential-proxy", async ({
+    librettoCli,
+  }) => {
+    const result = await librettoCli(
+      `cloud schedules create testWorkflow --cron "0 * * * *" --disable-default-proxy --residential-proxy '{"country":"US"}'`,
+      { LIBRETTO_API_KEY: "test-key" },
     );
-    expect(result.stdout).toContain("libretto cloud share <workflow>");
-    expect(result.stdout).toContain("--refresh");
-    expect(result.stderr).toBe("");
-  });
-
-  test("cloud share requires an API key", async ({ librettoCli }) => {
-    const result = await librettoCli("cloud share testWorkflow", {
-      LIBRETTO_API_KEY: undefined,
-    });
 
     expect(result.stderr).toContain(
-      "LIBRETTO_API_KEY is required to share Libretto Cloud workflow code.",
+      "Cannot pass both --disable-default-proxy and --residential-proxy.",
     );
-    expect(result.stderr).toContain("libretto cloud auth api-key issue");
   });
 
   test("prints deploy help with auto repair flag", async ({ librettoCli }) => {
@@ -663,7 +734,7 @@ export default workflow("main", async (ctx) => {
     const result = await librettoCli("cloud opne");
     expect(result.stderr).toContain("Unknown command: cloud opne");
     expect(result.stderr).toContain(
-      "Deploy workflows and manage hosted Libretto",
+      "Deploy workflows and manage Libretto Cloud",
     );
     expect(result.stderr).toContain("Usage: libretto cloud <subcommand>");
     expect(result.stderr).toContain(

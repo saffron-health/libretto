@@ -1,6 +1,18 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "outputDirectory": "dist/client",
+  "redirects": [
+    {
+      "source": "/marketplace",
+      "destination": "/open-workflows",
+      "permanent": true
+    },
+    {
+      "source": "/marketplace/:id",
+      "destination": "/open-workflows/:id",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/((?!docs(?:/|$)).*)",
@@ -56,6 +68,10 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/dashboard/workflows/:workflow",
+      "destination": "/dashboard/workflows"
+    },
     {
       "source": "/llms.txt",
       "destination": "https://libretto-docs.vercel.app/docs/llms.txt"

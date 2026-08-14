@@ -324,10 +324,13 @@ class BrowserDaemon {
     });
 
     // Navigate after telemetry is installed (so we capture the initial
-    // page load) but before starting the IPC server (so callers polling
-    // for IPC readiness see a page that has already loaded).
+    // document) but before starting the IPC server. Use waitUntil:
+    // "commit" — not Playwright's default "load" — because some apps
+    // paint a usable shell without finishing DOMContentLoaded/load;
+    // waiting for load would block daemon ready until navigation/startup
+    // timeouts. Workflows should wait for site-specific readiness.
     if (navigateUrl) {
-      await page.goto(navigateUrl);
+      await page.goto(navigateUrl, { waitUntil: "commit" });
     }
 
     const ipcServer = createIpcSocketServer((transport) => {
@@ -792,9 +795,9 @@ class BrowserDaemon {
   private async withRequestTimeout<T>(
     operation: () => Promise<T> | T,
   ): Promise<T> {
-    // All non-ping commands get a timeout guard. The timer is cleared
-    // when the command settles to avoid orphaned timers that would
-    // keep the event loop alive after shutdown.
+    // Safety timeout for small control ops (pages, snapshot, auth capture).
+    // Exec/readonly-exec intentionally skip this so Playwright timeouts
+    // surface their own diagnostics instead of a generic 60s race.
     let timerId: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_resolve, reject) => {
       timerId = setTimeout(
@@ -824,49 +827,49 @@ class BrowserDaemon {
     try {
       targetPage = this.resolveTargetPage(args.pageId);
       const page = targetPage;
-      const data = await this.withRequestTimeout(async () => {
-        const before = args.diffSnapshot ? await snapshot(page) : undefined;
-        const result = await handleExec(
-          page,
-          args.code,
-          this.execRepl,
-          args.visualize,
-        );
+      const before = args.diffSnapshot ? await snapshot(page) : undefined;
+      const result = await handleExec(
+        page,
+        args.code,
+        this.execRepl,
+        args.visualize,
+      );
 
-        if (!args.diffSnapshot || !before) {
-          return result;
-        }
+      if (!args.diffSnapshot || !before) {
+        return { ok: true, data: result };
+      }
 
-        try {
-          const waitResult = await waitForPageStable(page);
-          if (!waitResult.ok) {
-            this.logger.warn("compact-exec-stability-wait-incomplete", {
-              session: this.session,
-              pageId: args.pageId,
-              diagnostics: waitResult.diagnostics,
-            });
-          }
-
-          const after = await snapshot(page);
-          const snapshotDiff = diffSnapshots(before, after);
-          return { ...result, snapshotDiff };
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          this.logger.warn("compact-exec-diff-failed", {
+      try {
+        const waitResult = await waitForPageStable(page);
+        if (!waitResult.ok) {
+          this.logger.warn("compact-exec-stability-wait-incomplete", {
             session: this.session,
             pageId: args.pageId,
-            error: message,
+            diagnostics: waitResult.diagnostics,
           });
-          return {
+        }
+
+        const after = await snapshot(page);
+        const snapshotDiff = diffSnapshots(before, after);
+        return { ok: true, data: { ...result, snapshotDiff } };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn("compact-exec-diff-failed", {
+          session: this.session,
+          pageId: args.pageId,
+          error: message,
+        });
+        return {
+          ok: true,
+          data: {
             ...result,
             snapshotDiffError:
               `Failed to do post-diff snapshot: ${message}. ` +
               "The exec itself succeeded. Run libretto snapshot if you need the " +
               "current page state, or omit --diff-snapshot when the page may close.",
-          };
-        }
-      });
-      return { ok: true, data };
+          },
+        };
+      }
     } catch (error) {
       return this.createExecErrorResult(error);
     }
@@ -876,8 +879,9 @@ class BrowserDaemon {
     args: Parameters<CliToDaemonApi["readonlyExec"]>[0],
   ): Promise<DaemonExecResult> {
     try {
-      const data = await this.withRequestTimeout(() =>
-        handleReadonlyExec(this.resolveTargetPage(args.pageId), args.code),
+      const data = await handleReadonlyExec(
+        this.resolveTargetPage(args.pageId),
+        args.code,
       );
       return { ok: true, data };
     } catch (error) {

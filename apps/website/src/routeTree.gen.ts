@@ -12,12 +12,15 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as OpenWorkflowsRouteImport } from './routes/open-workflows'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as MarketplaceRouteImport } from './routes/marketplace'
 import { Route as InviteRouteImport } from './routes/invite'
+import { Route as HostedWorkflowsRouteImport } from './routes/hosted-workflows'
 import { Route as DebugAgentsRouteImport } from './routes/debug-agents'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CliRouteImport } from './routes/cli'
+import { Route as ChromeExtensionRouteImport } from './routes/chrome-extension'
 import { Route as BrowserToolsRouteImport } from './routes/browser-tools'
 import { Route as BrandKitRouteImport } from './routes/brand-kit'
 import { Route as BlogRouteRouteImport } from './routes/blog/route'
@@ -26,6 +29,7 @@ import { Route as BlogIndexRouteImport } from './routes/blog/index'
 import { Route as VsStagehandRouteImport } from './routes/vs/stagehand'
 import { Route as VsPlaywrightCodegenRouteImport } from './routes/vs/playwright-codegen'
 import { Route as VsBrowserUseRouteImport } from './routes/vs/browser-use'
+import { Route as OpenWorkflowsIdRouteImport } from './routes/open-workflows_.$id'
 import { Route as MarketplaceIdRouteImport } from './routes/marketplace_.$id'
 import { Route as GithubSetupRouteImport } from './routes/github.setup'
 import { Route as DashboardPrAgentRouteImport } from './routes/dashboard_.pr-agent'
@@ -33,6 +37,8 @@ import { Route as DashboardCloudBrowsersRouteImport } from './routes/dashboard_.
 import { Route as DashboardChromeExtensionRouteImport } from './routes/dashboard_.chrome-extension'
 import { Route as DashboardSectionRouteImport } from './routes/dashboard_.$section'
 import { Route as BlogSlugRouteImport } from './routes/blog/$slug'
+import { Route as HostedWorkflowsTenantSlugWorkflowNameRouteImport } from './routes/hosted-workflows_.$tenantSlug.$workflowName'
+import { Route as DashboardWorkflowsWorkflowRouteImport } from './routes/dashboard_.workflows_.$workflow'
 
 const VerifyEmailRoute = VerifyEmailRouteImport.update({
   id: '/verify-email',
@@ -47,6 +53,11 @@ const SigninRoute = SigninRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OpenWorkflowsRoute = OpenWorkflowsRouteImport.update({
+  id: '/open-workflows',
+  path: '/open-workflows',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OnboardingRoute = OnboardingRouteImport.update({
@@ -64,6 +75,11 @@ const InviteRoute = InviteRouteImport.update({
   path: '/invite',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HostedWorkflowsRoute = HostedWorkflowsRouteImport.update({
+  id: '/hosted-workflows',
+  path: '/hosted-workflows',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DebugAgentsRoute = DebugAgentsRouteImport.update({
   id: '/debug-agents',
   path: '/debug-agents',
@@ -77,6 +93,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const CliRoute = CliRouteImport.update({
   id: '/cli',
   path: '/cli',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChromeExtensionRoute = ChromeExtensionRouteImport.update({
+  id: '/chrome-extension',
+  path: '/chrome-extension',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BrowserToolsRoute = BrowserToolsRouteImport.update({
@@ -119,6 +140,11 @@ const VsBrowserUseRoute = VsBrowserUseRouteImport.update({
   path: '/vs/browser-use',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OpenWorkflowsIdRoute = OpenWorkflowsIdRouteImport.update({
+  id: '/open-workflows_/$id',
+  path: '/open-workflows/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MarketplaceIdRoute = MarketplaceIdRouteImport.update({
   id: '/marketplace_/$id',
   path: '/marketplace/$id',
@@ -155,18 +181,33 @@ const BlogSlugRoute = BlogSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => BlogRouteRoute,
 } as any)
+const HostedWorkflowsTenantSlugWorkflowNameRoute =
+  HostedWorkflowsTenantSlugWorkflowNameRouteImport.update({
+    id: '/hosted-workflows_/$tenantSlug/$workflowName',
+    path: '/hosted-workflows/$tenantSlug/$workflowName',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const DashboardWorkflowsWorkflowRoute =
+  DashboardWorkflowsWorkflowRouteImport.update({
+    id: '/dashboard_/workflows_/$workflow',
+    path: '/dashboard/workflows/$workflow',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/blog': typeof BlogRouteRouteWithChildren
   '/brand-kit': typeof BrandKitRoute
   '/browser-tools': typeof BrowserToolsRoute
+  '/chrome-extension': typeof ChromeExtensionRoute
   '/cli': typeof CliRoute
   '/dashboard': typeof DashboardRoute
   '/debug-agents': typeof DebugAgentsRoute
+  '/hosted-workflows': typeof HostedWorkflowsRoute
   '/invite': typeof InviteRoute
   '/marketplace': typeof MarketplaceRoute
   '/onboarding': typeof OnboardingRoute
+  '/open-workflows': typeof OpenWorkflowsRoute
   '/privacy': typeof PrivacyRoute
   '/signin': typeof SigninRoute
   '/verify-email': typeof VerifyEmailRoute
@@ -177,21 +218,27 @@ export interface FileRoutesByFullPath {
   '/dashboard/pr-agent': typeof DashboardPrAgentRoute
   '/github/setup': typeof GithubSetupRoute
   '/marketplace/$id': typeof MarketplaceIdRoute
+  '/open-workflows/$id': typeof OpenWorkflowsIdRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
   '/blog/': typeof BlogIndexRoute
+  '/dashboard/workflows/$workflow': typeof DashboardWorkflowsWorkflowRoute
+  '/hosted-workflows/$tenantSlug/$workflowName': typeof HostedWorkflowsTenantSlugWorkflowNameRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/brand-kit': typeof BrandKitRoute
   '/browser-tools': typeof BrowserToolsRoute
+  '/chrome-extension': typeof ChromeExtensionRoute
   '/cli': typeof CliRoute
   '/dashboard': typeof DashboardRoute
   '/debug-agents': typeof DebugAgentsRoute
+  '/hosted-workflows': typeof HostedWorkflowsRoute
   '/invite': typeof InviteRoute
   '/marketplace': typeof MarketplaceRoute
   '/onboarding': typeof OnboardingRoute
+  '/open-workflows': typeof OpenWorkflowsRoute
   '/privacy': typeof PrivacyRoute
   '/signin': typeof SigninRoute
   '/verify-email': typeof VerifyEmailRoute
@@ -202,10 +249,13 @@ export interface FileRoutesByTo {
   '/dashboard/pr-agent': typeof DashboardPrAgentRoute
   '/github/setup': typeof GithubSetupRoute
   '/marketplace/$id': typeof MarketplaceIdRoute
+  '/open-workflows/$id': typeof OpenWorkflowsIdRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
   '/blog': typeof BlogIndexRoute
+  '/dashboard/workflows/$workflow': typeof DashboardWorkflowsWorkflowRoute
+  '/hosted-workflows/$tenantSlug/$workflowName': typeof HostedWorkflowsTenantSlugWorkflowNameRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -213,12 +263,15 @@ export interface FileRoutesById {
   '/blog': typeof BlogRouteRouteWithChildren
   '/brand-kit': typeof BrandKitRoute
   '/browser-tools': typeof BrowserToolsRoute
+  '/chrome-extension': typeof ChromeExtensionRoute
   '/cli': typeof CliRoute
   '/dashboard': typeof DashboardRoute
   '/debug-agents': typeof DebugAgentsRoute
+  '/hosted-workflows': typeof HostedWorkflowsRoute
   '/invite': typeof InviteRoute
   '/marketplace': typeof MarketplaceRoute
   '/onboarding': typeof OnboardingRoute
+  '/open-workflows': typeof OpenWorkflowsRoute
   '/privacy': typeof PrivacyRoute
   '/signin': typeof SigninRoute
   '/verify-email': typeof VerifyEmailRoute
@@ -229,10 +282,13 @@ export interface FileRoutesById {
   '/dashboard_/pr-agent': typeof DashboardPrAgentRoute
   '/github/setup': typeof GithubSetupRoute
   '/marketplace_/$id': typeof MarketplaceIdRoute
+  '/open-workflows_/$id': typeof OpenWorkflowsIdRoute
   '/vs/browser-use': typeof VsBrowserUseRoute
   '/vs/playwright-codegen': typeof VsPlaywrightCodegenRoute
   '/vs/stagehand': typeof VsStagehandRoute
   '/blog/': typeof BlogIndexRoute
+  '/dashboard_/workflows_/$workflow': typeof DashboardWorkflowsWorkflowRoute
+  '/hosted-workflows_/$tenantSlug/$workflowName': typeof HostedWorkflowsTenantSlugWorkflowNameRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -241,12 +297,15 @@ export interface FileRouteTypes {
     | '/blog'
     | '/brand-kit'
     | '/browser-tools'
+    | '/chrome-extension'
     | '/cli'
     | '/dashboard'
     | '/debug-agents'
+    | '/hosted-workflows'
     | '/invite'
     | '/marketplace'
     | '/onboarding'
+    | '/open-workflows'
     | '/privacy'
     | '/signin'
     | '/verify-email'
@@ -257,21 +316,27 @@ export interface FileRouteTypes {
     | '/dashboard/pr-agent'
     | '/github/setup'
     | '/marketplace/$id'
+    | '/open-workflows/$id'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
     | '/blog/'
+    | '/dashboard/workflows/$workflow'
+    | '/hosted-workflows/$tenantSlug/$workflowName'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/brand-kit'
     | '/browser-tools'
+    | '/chrome-extension'
     | '/cli'
     | '/dashboard'
     | '/debug-agents'
+    | '/hosted-workflows'
     | '/invite'
     | '/marketplace'
     | '/onboarding'
+    | '/open-workflows'
     | '/privacy'
     | '/signin'
     | '/verify-email'
@@ -282,22 +347,28 @@ export interface FileRouteTypes {
     | '/dashboard/pr-agent'
     | '/github/setup'
     | '/marketplace/$id'
+    | '/open-workflows/$id'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
     | '/blog'
+    | '/dashboard/workflows/$workflow'
+    | '/hosted-workflows/$tenantSlug/$workflowName'
   id:
     | '__root__'
     | '/'
     | '/blog'
     | '/brand-kit'
     | '/browser-tools'
+    | '/chrome-extension'
     | '/cli'
     | '/dashboard'
     | '/debug-agents'
+    | '/hosted-workflows'
     | '/invite'
     | '/marketplace'
     | '/onboarding'
+    | '/open-workflows'
     | '/privacy'
     | '/signin'
     | '/verify-email'
@@ -308,10 +379,13 @@ export interface FileRouteTypes {
     | '/dashboard_/pr-agent'
     | '/github/setup'
     | '/marketplace_/$id'
+    | '/open-workflows_/$id'
     | '/vs/browser-use'
     | '/vs/playwright-codegen'
     | '/vs/stagehand'
     | '/blog/'
+    | '/dashboard_/workflows_/$workflow'
+    | '/hosted-workflows_/$tenantSlug/$workflowName'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -319,12 +393,15 @@ export interface RootRouteChildren {
   BlogRouteRoute: typeof BlogRouteRouteWithChildren
   BrandKitRoute: typeof BrandKitRoute
   BrowserToolsRoute: typeof BrowserToolsRoute
+  ChromeExtensionRoute: typeof ChromeExtensionRoute
   CliRoute: typeof CliRoute
   DashboardRoute: typeof DashboardRoute
   DebugAgentsRoute: typeof DebugAgentsRoute
+  HostedWorkflowsRoute: typeof HostedWorkflowsRoute
   InviteRoute: typeof InviteRoute
   MarketplaceRoute: typeof MarketplaceRoute
   OnboardingRoute: typeof OnboardingRoute
+  OpenWorkflowsRoute: typeof OpenWorkflowsRoute
   PrivacyRoute: typeof PrivacyRoute
   SigninRoute: typeof SigninRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
@@ -334,9 +411,12 @@ export interface RootRouteChildren {
   DashboardPrAgentRoute: typeof DashboardPrAgentRoute
   GithubSetupRoute: typeof GithubSetupRoute
   MarketplaceIdRoute: typeof MarketplaceIdRoute
+  OpenWorkflowsIdRoute: typeof OpenWorkflowsIdRoute
   VsBrowserUseRoute: typeof VsBrowserUseRoute
   VsPlaywrightCodegenRoute: typeof VsPlaywrightCodegenRoute
   VsStagehandRoute: typeof VsStagehandRoute
+  DashboardWorkflowsWorkflowRoute: typeof DashboardWorkflowsWorkflowRoute
+  HostedWorkflowsTenantSlugWorkflowNameRoute: typeof HostedWorkflowsTenantSlugWorkflowNameRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -362,6 +442,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/open-workflows': {
+      id: '/open-workflows'
+      path: '/open-workflows'
+      fullPath: '/open-workflows'
+      preLoaderRoute: typeof OpenWorkflowsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/onboarding': {
       id: '/onboarding'
       path: '/onboarding'
@@ -383,6 +470,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InviteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/hosted-workflows': {
+      id: '/hosted-workflows'
+      path: '/hosted-workflows'
+      fullPath: '/hosted-workflows'
+      preLoaderRoute: typeof HostedWorkflowsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/debug-agents': {
       id: '/debug-agents'
       path: '/debug-agents'
@@ -402,6 +496,13 @@ declare module '@tanstack/react-router' {
       path: '/cli'
       fullPath: '/cli'
       preLoaderRoute: typeof CliRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chrome-extension': {
+      id: '/chrome-extension'
+      path: '/chrome-extension'
+      fullPath: '/chrome-extension'
+      preLoaderRoute: typeof ChromeExtensionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/browser-tools': {
@@ -460,6 +561,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VsBrowserUseRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/open-workflows_/$id': {
+      id: '/open-workflows_/$id'
+      path: '/open-workflows/$id'
+      fullPath: '/open-workflows/$id'
+      preLoaderRoute: typeof OpenWorkflowsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/marketplace_/$id': {
       id: '/marketplace_/$id'
       path: '/marketplace/$id'
@@ -509,6 +617,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BlogSlugRouteImport
       parentRoute: typeof BlogRouteRoute
     }
+    '/hosted-workflows_/$tenantSlug/$workflowName': {
+      id: '/hosted-workflows_/$tenantSlug/$workflowName'
+      path: '/hosted-workflows/$tenantSlug/$workflowName'
+      fullPath: '/hosted-workflows/$tenantSlug/$workflowName'
+      preLoaderRoute: typeof HostedWorkflowsTenantSlugWorkflowNameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard_/workflows_/$workflow': {
+      id: '/dashboard_/workflows_/$workflow'
+      path: '/dashboard/workflows/$workflow'
+      fullPath: '/dashboard/workflows/$workflow'
+      preLoaderRoute: typeof DashboardWorkflowsWorkflowRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -531,12 +653,15 @@ const rootRouteChildren: RootRouteChildren = {
   BlogRouteRoute: BlogRouteRouteWithChildren,
   BrandKitRoute: BrandKitRoute,
   BrowserToolsRoute: BrowserToolsRoute,
+  ChromeExtensionRoute: ChromeExtensionRoute,
   CliRoute: CliRoute,
   DashboardRoute: DashboardRoute,
   DebugAgentsRoute: DebugAgentsRoute,
+  HostedWorkflowsRoute: HostedWorkflowsRoute,
   InviteRoute: InviteRoute,
   MarketplaceRoute: MarketplaceRoute,
   OnboardingRoute: OnboardingRoute,
+  OpenWorkflowsRoute: OpenWorkflowsRoute,
   PrivacyRoute: PrivacyRoute,
   SigninRoute: SigninRoute,
   VerifyEmailRoute: VerifyEmailRoute,
@@ -546,9 +671,13 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardPrAgentRoute: DashboardPrAgentRoute,
   GithubSetupRoute: GithubSetupRoute,
   MarketplaceIdRoute: MarketplaceIdRoute,
+  OpenWorkflowsIdRoute: OpenWorkflowsIdRoute,
   VsBrowserUseRoute: VsBrowserUseRoute,
   VsPlaywrightCodegenRoute: VsPlaywrightCodegenRoute,
   VsStagehandRoute: VsStagehandRoute,
+  DashboardWorkflowsWorkflowRoute: DashboardWorkflowsWorkflowRoute,
+  HostedWorkflowsTenantSlugWorkflowNameRoute:
+    HostedWorkflowsTenantSlugWorkflowNameRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

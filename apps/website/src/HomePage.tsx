@@ -17,6 +17,8 @@ import { Footer } from "./components/Footer";
 import { VersionBadge } from "./components/VersionBadge";
 import { ProductListing } from "./components/ProductListing";
 import { SectionDivider } from "./components/SectionDivider.js";
+import { BackedByYC } from "./components/BackedByYC";
+import { Button } from "./components/Button";
 
 function Hero({
   paneUnlocked,
@@ -47,7 +49,11 @@ function Hero({
         />
       </div>
       <div className="relative mx-auto max-w-[1200px]">
-        <div data-animate={AnimationTarget.Navbar} style={{ opacity: 0 }}>
+        <div
+          data-animate={AnimationTarget.Navbar}
+          style={{ opacity: 0 }}
+          className="mb-8 flex justify-center"
+        >
           <VersionBadge />
         </div>
         <div
@@ -71,7 +77,7 @@ function Hero({
               lineHeight: 1.05,
             }}
           >
-            Automate the work that happens in your browser
+            Turn any workflow into a stable API.
           </AnimatedTitle>
         </Text>
         <Text
@@ -79,10 +85,10 @@ function Hero({
           size="lg"
           data-animate={AnimationTarget.Content}
           htmlStyle={{ opacity: 0 }}
-          className="mx-auto mb-8 max-w-[640px] text-center leading-relaxed md:text-base [text-wrap:pretty]"
+          className="mx-auto mb-8 max-w-[720px] text-center leading-relaxed [text-wrap:pretty]"
         >
-          Libretto makes tools for humans and agents to automate any browser
-          task: Chrome extensions, CLIs, SDKs, cloud browsers, and more.
+          Libretto helps coding agents autonomously manage integrations: browser
+          workflows, web scrapers, on-prem apps, and more.
         </Text>
         <div
           data-animate={AnimationTarget.Content}
@@ -90,15 +96,19 @@ function Hero({
           className="flex flex-col items-center justify-center gap-3"
         >
           <InstallSnippet />
-          <div className="text-xs text-muted">
-            or{" "}
-            <a
-              href="https://cal.com/team/libretto/demo"
-              className="text-muted underline decoration-muted decoration-1 underline-offset-4 transition-colors duration-100 hover:text-ink hover:decoration-accent"
-              data-fathom-event="Hero demo click"
-            >
-              TALK TO A DEV
-            </a>
+          <span className="mt-1 font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
+            or
+          </span>
+          <Button
+            href="https://cal.com/team/libretto/15-min"
+            variant="outline"
+            className="mt-1 min-w-56"
+            data-fathom-event="Hero demo click"
+          >
+            Talk to a dev · 15 min
+          </Button>
+          <div className="mt-10">
+            <BackedByYC />
           </div>
         </div>
       </div>

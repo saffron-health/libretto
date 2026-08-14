@@ -1,0 +1,43 @@
+---
+title: Sharing workflows externally
+sidebarTitle: Sharing externally
+"og:image": "https://libretto.sh/docs/og/libretto-cloud-hosting/sharing-workflows-externally.png"
+---
+
+> Share a deployed workflow publicly as a hosted API with visible source code. Workflows stay private until you share them.
+
+Deploying a workflow makes it available inside your organization. Sharing it publicly creates a public run API and shares the reviewed source so others can inspect or adapt it.
+
+### What publication includes
+
+Every published workflow has one public page with:
+
+- A hosted run endpoint that callers use with their own Libretto API key and credentials
+- Input and output types
+- Required credential names
+- Source files that visitors can inspect or adapt
+
+Libretto reviews the source for secrets and other sensitive information before sharing. Blocked findings must be fixed; warnings require explicit acknowledgement. Workspace sharing must also be on in organization settings.
+
+### Share from the dashboard
+
+1. Sign in at [libretto.sh](https://libretto.sh) and open your workspace dashboard.
+2. Deploy the workflow so it is ready in Cloud.
+3. Open the workflow and expand Share workflow outside this workspace.
+4. Add an optional description and select Share publicly.
+5. Resolve any blocked privacy findings or acknowledge warnings after reviewing them.
+6. If sharing is off, enable it in [Settings](https://libretto.sh/dashboard/settings), then share again.
+
+You can also share from a terminal:
+
+```bash
+libretto cloud share myWorkflow
+```
+
+Use `--acknowledge-warnings` only after reviewing the findings printed by the command. Remove both the public API and source with `libretto cloud unshare myWorkflow`.
+
+### What stays private
+
+- Credentials and secret values
+- Your organization's run history and job logs
+- The publisher's and callers' inputs, outputs, logs, and run history

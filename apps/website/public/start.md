@@ -58,11 +58,25 @@ export default workflow("scrape-page", async ({ page }) => {
 });
 ```
 
-Run it:
+Run it with a local browser first:
 
 ```bash
 npx libretto run src/workflows/scrape-page.ts --headless
 ```
+
+### If local Chromium fails in a sandbox
+
+Agent sandboxes (for example Claude Cowork) can install npm packages but often cannot launch local Chromium: missing shared libraries (such as `libXdamage.so.1`), no sudo, and blocked `playwright install-deps` / apt. Do not keep retrying apt, sudo, or OS dependency installs.
+
+Fall back in this order:
+
+1. Check auth with `npx libretto cloud auth whoami`. If not logged in, run `npx libretto cloud auth login` yourself (use `npx libretto cloud auth signup` when they need a new account). That command prints a browser sign-in/sign-up URL and waits; share the URL with the user, do not ask them to run the CLI. After auth succeeds, verify with Libretto Cloud:
+
+```bash
+npx libretto run src/workflows/scrape-page.ts --provider libretto-cloud
+```
+
+2. If cloud auth cannot complete in this environment, stop fighting local Chromium. Treat setup as complete once the package is installed and the smoke workflow exists, and report that browser verification needs Libretto Cloud or a host machine with working Chromium. Do not ask the user to run CLI commands.
 
 ## 5. Finish
 

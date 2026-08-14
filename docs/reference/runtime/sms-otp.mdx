@@ -1,0 +1,104 @@
+---
+title: SMS OTP
+"og:image": "https://libretto.sh/docs/og/reference/runtime/sms-otp.png"
+---
+
+> Claim a Libretto Cloud SMS inbox, then wait for an inbound one-time code during a portal login.
+
+### `claimSmsOtp()`
+
+`claimSmsOtp` locks a tenant SMS inbox number, then returns a handle whose `wait()` method polls until the inbound code arrives. Use it when a portal texts a one-time code. Prefer authenticator TOTP (`*_totp_secret`) when the portal supports it.
+
+Provision inbox numbers outside the workflow (CLI or dashboard), register the full phone number on the portal MFA settings, then call `claimSmsOtp` in the sign-in path. See [SMS OTP on Libretto Cloud](/libretto-cloud-api/sms-otp) for pool APIs and isolation rules.
+
+```typescript theme={null}
+async function claimSmsOtp(options: ClaimSmsOtpOptions): Promise<SmsOtpClaim>;
+```
+
+Await the claim before clicking send-code so the lock is held when the SMS arrives. Call `otp.wait()` after send-code.
+
+Auth is automatic — do not put an API key in workflow source:
+
+- Local runs: set `LIBRETTO_API_KEY` (same key as deploy and CLI).
+- Hosted Cloud jobs: dispatch injects a short-lived job token; `claimSmsOtp` picks it up with no extra args.
+
+#### Options
+
+Pass exactly one of `phoneNumberId`, `phoneNumberLabel`, or `phoneNumber` to select the inbox.
+
+<ParamField path="phoneNumberId" type="string">
+  Pool phone-number id from `/v1/smsNumbers`.
+</ParamField>
+
+<ParamField path="phoneNumberLabel" type="string">
+  Label set when the inbox was provisioned (for example `uhc`). Prefer one
+  number per portal.
+</ParamField>
+
+<ParamField path="phoneNumber" type="string">
+  Full phone number with country code (for example `+15551234567`) from the
+  tenant pool.
+</ParamField>
+
+<ParamField path="timeoutMs" type="number">
+  How long to wait for the inbound SMS after the claim opens. Also sets the
+  inbox claim lock (clamped to 30–300 seconds on the API). Defaults to
+  `120000`.
+</ParamField>
+
+<ParamField path="pollIntervalMs" type="number">
+  Poll interval while waiting for the code. Defaults to `1500`.
+</ParamField>
+
+<ParamField path="apiKey" type="string">
+  Optional override. Prefer omitting this so local runs use
+  `LIBRETTO_API_KEY` and hosted jobs use the injected job token.
+</ParamField>
+
+<ParamField path="apiUrl" type="string">
+  Libretto Cloud API base URL. Defaults to `LIBRETTO_API_URL` or
+  `https://api.libretto.sh`.
+</ParamField>
+
+#### Return value
+
+<ResponseField name="phoneNumber" type="string">
+  The claimed inbox number (with country code).
+</ResponseField>
+
+<ResponseField name="claimId" type="string">
+  Id of the open claim.
+</ResponseField>
+
+<ResponseField name="phoneNumberId" type="string">
+  Pool phone-number id for the claimed inbox.
+</ResponseField>
+
+<ResponseField name="wait" type="() => Promise&lt;SmsOtpCode&gt;">
+  Polls until the claim is fulfilled, then returns `{ code, phoneNumber,
+  claimId }` once. Expires the claim if the wait times out or errors.
+</ResponseField>
+
+#### Example
+
+```typescript theme={null}
+import { claimSmsOtp, workflow } from "libretto";
+
+export default workflow("portal-login", {
+  credentials: ["username", "password"],
+  async handler(ctx, input) {
+    // ... fill username/password, then:
+    const otp = await claimSmsOtp({ phoneNumberLabel: "uhc" });
+    // Inbox is locked. otp.phoneNumber is the claimed number.
+
+    await ctx.page.click('button:has-text("Send code")');
+    const { code } = await otp.wait();
+    await ctx.page.fill('input[name="otp"]', code);
+  },
+});
+```
+
+<Note>
+  Do not run concurrent SMS OTP claims on the same inbox number. A claim locks
+  the inbox for up to 5 minutes; consuming the code unlocks it.
+</Note>

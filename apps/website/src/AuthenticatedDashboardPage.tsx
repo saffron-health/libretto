@@ -11,24 +11,13 @@ import {
 import { InstallSnippet } from "./components/InstallSnippet";
 import { GitHubIcon } from "./icons";
 import { DEBUGGER_PROMPT, GITHUB_APP_INSTALL_URL } from "./prAgentSetup";
+import type { DashboardSection } from "./dashboardSections";
 
 const CLOUD_SETUP_PROMPT =
   "Fetch and follow https://libretto.sh/cloud.md to set up Libretto Cloud hosted browsers for this project.";
 
-export const dashboardSections = [
-  "workflows",
-  "schedules",
-  "workflow_runs",
-  "browser_sessions",
-  "connected_repos",
-  "users",
-  "settings",
-  "secrets",
-  "api_keys",
-  "billing",
-] as const;
-
-export type DashboardSection = (typeof dashboardSections)[number];
+export { dashboardSections } from "./dashboardSections";
+export type { DashboardSection } from "./dashboardSections";
 
 interface NavItem {
   id: DashboardSection;
@@ -121,8 +110,8 @@ const navItems: NavItem[] = [
     label: "Settings",
     icon: (
       <NavIcon>
-        <circle cx="10" cy="10" r="2.5" />
-        <path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M15.3 4.7l-1.4 1.4M6.1 13.9l-1.4 1.4" />
+        <path d="M8.58 1.92L11.42 1.92L11.68 4.14L12.96 4.66L14.70 3.28L16.72 5.30L15.34 7.04L15.86 8.32L18.08 8.58L18.08 11.42L15.86 11.68L15.34 12.96L16.72 14.70L14.70 16.72L12.96 15.34L11.68 15.86L11.42 18.08L8.58 18.08L8.32 15.86L7.04 15.34L5.30 16.72L3.28 14.70L4.66 12.96L4.14 11.68L1.92 11.42L1.92 8.58L4.14 8.32L4.66 7.04L3.28 5.30L5.30 3.28L7.04 4.66L8.32 4.14Z" />
+        <circle cx="10" cy="10" r="2.6" />
       </NavIcon>
     ),
   },
@@ -133,6 +122,16 @@ const navItems: NavItem[] = [
       <NavIcon>
         <rect x="4" y="8" width="12" height="9" rx="2" />
         <path d="M7 8V6a3 3 0 0 1 6 0v2M10 12v2" />
+      </NavIcon>
+    ),
+  },
+  {
+    id: "phone_numbers",
+    label: "Phone numbers",
+    icon: (
+      <NavIcon>
+        <rect x="5" y="2.5" width="10" height="15" rx="2" />
+        <path d="M8 14.5h4M10 5v1" />
       </NavIcon>
     ),
   },
@@ -163,6 +162,7 @@ const accountSectionOrder: DashboardSection[] = [
   "settings",
   "billing",
   "secrets",
+  "phone_numbers",
   "api_keys",
 ];
 const primaryNavItems = navItems.filter(
@@ -212,6 +212,11 @@ const sectionMeta: Record<
     title: "Secrets",
     description:
       "Encrypted values available to workflows without exposing them in code.",
+  },
+  phone_numbers: {
+    title: "Phone numbers",
+    description:
+      "SMS inbox numbers for portal OTP. Prefer one number per portal, and register the full phone number (with country code, like +15551234567) on the portal account.",
   },
   api_keys: {
     title: "API keys",
@@ -363,8 +368,16 @@ function TableShell({ children }: { children: ReactNode }) {
 
 const thClass =
   "whitespace-nowrap border-b border-rule bg-panel-hi/65 px-5 py-3 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-muted";
-const tdClass =
-  "border-b border-rule px-5 py-4 text-sm text-muted last:border-b-0";
+const tdClass = "border-b border-rule px-5 py-4 text-sm text-muted";
+const tableClass =
+  "w-full border-collapse [&_tbody_tr:last-child_td]:border-b-0";
+const tableActionClass =
+  "inline-flex h-7 items-center rounded-md border border-rule px-2.5 text-xs text-muted no-underline transition-colors hover:border-accent/40 hover:text-ink";
+const tableDangerActionClass =
+  "inline-flex h-7 items-center rounded-md border border-red-400/25 px-2.5 text-xs text-red-200 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60";
+const tableSelectClass =
+  "-ml-2 h-7 max-w-full rounded-md border border-transparent bg-transparent py-0 pl-2 pr-7 text-sm text-muted outline-none transition-colors hover:border-rule focus:border-accent/45 disabled:opacity-60";
+const tableSelectStaticClass = "inline-flex h-7 items-center text-sm text-muted";
 
 function ProfileMenu({
   session,
@@ -428,15 +441,19 @@ function ProfileMenu({
   );
 }
 
-function DashboardShell({
+export function DashboardShell({
   section,
   session,
   action,
+  title,
+  description,
   children,
 }: {
   section: DashboardSection;
   session: CloudSession;
   action?: ReactNode;
+  title?: string;
+  description?: string;
   children: ReactNode;
 }) {
   const meta = sectionMeta[section];
@@ -507,10 +524,10 @@ function DashboardShell({
           <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h1 className="font-serif text-[36px] font-[300] tracking-[-0.025em] md:text-[44px]">
-                {meta.title}
+                {title ?? meta.title}
               </h1>
               <p className="mt-2 text-sm leading-6 text-muted">
-                {meta.description}
+                {description ?? meta.description}
               </p>
             </div>
             {action}
@@ -545,11 +562,14 @@ function WorkflowsTable() {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     orpcCall<{
-      deployed_workflows: WorkflowRow[];
-      in_progress_builds: WorkflowBuildRow[];
+      deployed_workflows?: WorkflowRow[];
+      in_progress_builds?: WorkflowBuildRow[];
     }>("/v1/workflows/list")
       .then((result) =>
-        setRows([...result.in_progress_builds, ...result.deployed_workflows]),
+        setRows([
+          ...(result.in_progress_builds ?? []),
+          ...(result.deployed_workflows ?? []),
+        ]),
       )
       .catch((err) =>
         setError(
@@ -559,7 +579,7 @@ function WorkflowsTable() {
   }, []);
   return (
     <TableShell>
-      <table className="w-full min-w-[760px] border-collapse">
+      <table className={`${tableClass} min-w-[760px]`}>
         <thead>
           <tr>
             <th className={thClass}>Workflow</th>
@@ -578,7 +598,16 @@ function WorkflowsTable() {
                 className="hover:bg-panel-hi/35"
               >
                 <td className={`${tdClass} font-medium text-ink`}>
-                  {build ? row.workflow_name || "New workflow" : row.name}
+                  {build ? (
+                    row.workflow_name || "New workflow"
+                  ) : (
+                    <a
+                      href={`/dashboard/workflows/${encodeURIComponent(row.name)}`}
+                      className="text-ink underline decoration-rule underline-offset-4 hover:decoration-accent"
+                    >
+                      {row.name}
+                    </a>
+                  )}
                 </td>
                 <td className={tdClass}>
                   <StatusBadge
@@ -666,7 +695,7 @@ function SchedulesTable() {
   }
   return (
     <TableShell>
-      <table className="w-full min-w-[900px] border-collapse">
+      <table className={`${tableClass} min-w-[900px]`}>
         <thead>
           <tr>
             <th className={thClass}>Workflow</th>
@@ -703,14 +732,14 @@ function SchedulesTable() {
                   <button
                     type="button"
                     onClick={() => void toggle(row)}
-                    className="rounded-md border border-rule px-2.5 py-1.5 text-xs text-muted hover:border-accent/40 hover:text-ink"
+                    className={tableActionClass}
                   >
                     {row.enabled ? "Pause" : "Resume"}
                   </button>
                   <button
                     type="button"
                     onClick={() => void remove(row)}
-                    className="rounded-md border border-red-400/25 px-2.5 py-1.5 text-xs text-red-200 hover:bg-red-500/10"
+                    className={tableDangerActionClass}
                   >
                     Delete
                   </button>
@@ -756,7 +785,7 @@ function WorkflowRunsTable() {
   }, []);
   return (
     <TableShell>
-      <table className="w-full min-w-[850px] border-collapse">
+      <table className={`${tableClass} min-w-[850px]`}>
         <thead>
           <tr>
             <th className={thClass}>Workflow</th>
@@ -841,7 +870,7 @@ function BrowserSessionsTable() {
   }, []);
   return (
     <TableShell>
-      <table className="w-full min-w-[850px] border-collapse">
+      <table className={`${tableClass} min-w-[850px]`}>
         <thead>
           <tr>
             <th className={thClass}>Session</th>
@@ -850,7 +879,7 @@ function BrowserSessionsTable() {
             <th className={thClass}>Provider</th>
             <th className={thClass}>Started</th>
             <th className={thClass}>Runtime</th>
-            <th className={thClass}></th>
+            <th className={thClass}>Live view</th>
           </tr>
         </thead>
         <tbody>
@@ -871,15 +900,17 @@ function BrowserSessionsTable() {
               <td className={tdClass}>{formatDate(row.started_at)}</td>
               <td className={tdClass}>{formatDuration(row.duration_ms)}</td>
               <td className={tdClass}>
-                {row.live_view_url && (
+                {row.live_view_url ? (
                   <a
                     href={row.live_view_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-xs text-accent-bright underline underline-offset-4"
+                    className={tableActionClass}
                   >
                     Open
                   </a>
+                ) : (
+                  <span className="text-xs text-muted/50">—</span>
                 )}
               </td>
             </tr>
@@ -906,21 +937,28 @@ interface RepoRow {
   linked_at: string;
   account_login: string;
 }
-function ConnectedReposTable() {
+function ConnectedReposTable({
+  onHasRepositoriesChange,
+}: {
+  onHasRepositoriesChange: (hasRepositories: boolean) => void;
+}) {
   const [rows, setRows] = useState<RepoRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     orpcCall<{ repositories: RepoRow[] }>("/v1/github/listLinkedRepositories")
-      .then((r) => setRows(r.repositories))
+      .then((r) => {
+        setRows(r.repositories);
+        onHasRepositoriesChange(r.repositories.length > 0);
+      })
       .catch((err) =>
         setError(
           err instanceof Error ? err.message : "Could not load repositories.",
         ),
       );
-  }, []);
+  }, [onHasRepositoriesChange]);
   return (
     <TableShell>
-      <table className="w-full min-w-[700px] border-collapse">
+      <table className={`${tableClass} min-w-[700px]`}>
         <thead>
           <tr>
             <th className={thClass}>Repository</th>
@@ -1107,7 +1145,7 @@ function UsersTable({
         </p>
       )}
       <TableShell>
-        <table className="w-full min-w-[760px] border-collapse">
+        <table className={`${tableClass} min-w-[760px]`}>
           <thead>
             <tr>
               <th className={thClass}>User</th>
@@ -1137,13 +1175,16 @@ function UsersTable({
                       onChange={(event) =>
                         void updateRole(user, event.target.value)
                       }
-                      className="h-8 rounded-md border border-rule bg-bg px-2 text-xs text-ink"
+                      className={tableSelectClass}
+                      aria-label={`Role for ${user.email}`}
                     >
                       <option value="member">Member</option>
                       <option value="owner">Owner</option>
                     </select>
                   ) : (
-                    titleCase(user.role)
+                    <span className={tableSelectStaticClass}>
+                      {titleCase(user.role)}
+                    </span>
                   )}
                 </td>
                 <td className={tdClass}>
@@ -1158,7 +1199,7 @@ function UsersTable({
                       type="button"
                       disabled={busy === user.id}
                       onClick={() => void remove(user)}
-                      className="rounded-md border border-red-400/25 px-2.5 py-1.5 text-xs text-red-200 hover:bg-red-500/10"
+                      className={tableDangerActionClass}
                     >
                       Remove
                     </button>
@@ -1502,7 +1543,7 @@ function SecretsTable({
       )}
 
       <TableShell>
-        <table className="w-full min-w-[720px] border-collapse">
+        <table className={`${tableClass} min-w-[720px]`}>
           <thead>
             <tr>
               <th className={thClass}>Name</th>
@@ -1524,14 +1565,14 @@ function SecretsTable({
                     <button
                       type="button"
                       onClick={() => startEditing(row, "rename")}
-                      className="rounded-md border border-rule px-2.5 py-1.5 text-xs text-muted hover:border-accent/40 hover:text-ink"
+                      className={tableActionClass}
                     >
                       Rename
                     </button>
                     <button
                       type="button"
                       onClick={() => startEditing(row, "replace")}
-                      className="rounded-md border border-rule px-2.5 py-1.5 text-xs text-muted hover:border-accent/40 hover:text-ink"
+                      className={tableActionClass}
                     >
                       Replace
                     </button>
@@ -1539,7 +1580,7 @@ function SecretsTable({
                       type="button"
                       disabled={busy === row.credential_id}
                       onClick={() => void remove(row)}
-                      className="rounded-md border border-red-400/25 px-2.5 py-1.5 text-xs text-red-200 hover:bg-red-500/10 disabled:opacity-60"
+                      className={tableDangerActionClass}
                     >
                       {busy === row.credential_id ? "Deleting…" : "Delete"}
                     </button>
@@ -1554,6 +1595,318 @@ function SecretsTable({
       </TableShell>
     </div>
   );
+}
+
+interface SmsNumberRow {
+  id: string;
+  phone_number: string;
+  label: string | null;
+  status: "active" | "released";
+  created_at: string;
+  updated_at: string;
+}
+
+function CopyNumberButton({ phoneNumber }: { phoneNumber: string }) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1500);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void navigator.clipboard.writeText(phoneNumber).then(() => setCopied(true));
+      }}
+      aria-label={copied ? "Copied" : `Copy ${phoneNumber}`}
+      title={copied ? "Copied" : "Copy number"}
+      className="text-muted transition-colors hover:text-accent-bright"
+    >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 20 20"
+        className="size-4"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      >
+        {copied ? (
+          <path d="m4.5 10.5 3.5 3.5 7.5-8" />
+        ) : (
+          <>
+            <rect x="7.5" y="7.5" width="9" height="9" rx="1.5" />
+            <path d="M12.5 4.5H5A1.5 1.5 0 0 0 3.5 6v7" />
+          </>
+        )}
+      </svg>
+    </button>
+  );
+}
+
+function PhoneNumbersTable({
+  showCreate,
+  onCloseCreate,
+}: {
+  showCreate: boolean;
+  onCloseCreate: () => void;
+}) {
+  const [rows, setRows] = useState<SmsNumberRow[] | null>(null);
+  const [label, setLabel] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function refresh() {
+    const result = await orpcCall<{ numbers: SmsNumberRow[] }>(
+      "/v1/dashboard/smsNumbers",
+    );
+    setRows(result.numbers);
+  }
+
+  useEffect(() => {
+    refresh().catch((err) =>
+      setError(
+        err instanceof Error ? err.message : "Could not load phone numbers.",
+      ),
+    );
+  }, []);
+
+  async function provision(event: FormEvent) {
+    event.preventDefault();
+    setBusy("create");
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await orpcCall<{
+        success: true;
+        number: SmsNumberRow;
+        message: string;
+      }>("/v1/dashboard/provisionSmsNumber", {
+        label: label.trim() || undefined,
+      });
+      setLabel("");
+      setNotice(
+        `${result.number.phone_number} is ready. Register it as the MFA phone on the portal account.`,
+      );
+      onCloseCreate();
+      await refresh();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not provision a number.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function startEditingLabel(row: SmsNumberRow) {
+    setEditingId(row.id);
+    setEditLabel(row.label ?? "");
+    setError(null);
+    setNotice(null);
+  }
+
+  async function saveLabel(row: SmsNumberRow) {
+    const trimmed = editLabel.trim();
+    setEditingId(null);
+    if (trimmed === (row.label ?? "")) return;
+    setBusy(row.id);
+    setError(null);
+    setNotice(null);
+    try {
+      await orpcCall("/v1/dashboard/updateSmsNumber", {
+        id: row.id,
+        label: trimmed || null,
+      });
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save the label.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function deleteNumber(row: SmsNumberRow) {
+    if (
+      !window.confirm(
+        `Delete ${row.phone_number}? This releases the number for good, and any portal still texting passcodes here must be updated.`,
+      )
+    ) {
+      return;
+    }
+    setBusy(row.id);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await orpcCall<{ success: true; message: string }>(
+        "/v1/dashboard/releaseSmsNumber",
+        { id: row.id },
+      );
+      setNotice(result.message);
+      await refresh();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not delete the number.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {showCreate && (
+        <form
+          onSubmit={(event) => void provision(event)}
+          className="grid gap-3 rounded-xl border border-accent/25 bg-green-3/20 p-4 md:grid-cols-[minmax(0,18rem)_auto] md:items-end"
+        >
+          <label>
+            <span className="mb-2 block text-xs uppercase text-muted">
+              Label (optional)
+            </span>
+            <input
+              value={label}
+              onChange={(event) => setLabel(event.target.value)}
+              placeholder="uhc"
+              autoFocus
+              className="h-10 w-full rounded-md border border-rule bg-bg px-3 text-sm outline-none focus:border-accent"
+            />
+          </label>
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={busy === "create"}
+              className="libretto-button libretto-button--default h-10"
+            >
+              {busy === "create" ? "Provisioning…" : "Provision number"}
+            </button>
+            <button
+              type="button"
+              onClick={onCloseCreate}
+              className="h-10 px-3 text-sm text-muted hover:text-ink"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+      {error && (
+        <p className="rounded-md border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p className="rounded-md border border-accent/30 bg-green-3/25 px-4 py-3 text-sm text-accent-bright">
+          {notice}
+        </p>
+      )}
+      <TableShell>
+        <table className="w-full min-w-[720px] border-collapse">
+          <thead>
+            <tr>
+              <th className={thClass}>Phone</th>
+              <th className={thClass}>Label</th>
+              <th className={thClass}>Created</th>
+              <th className={thClass}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows?.map((row) => (
+              <tr key={row.id} className="hover:bg-panel-hi/35">
+                <td className={tdClass}>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs text-ink">
+                      {row.phone_number}
+                    </span>
+                    <CopyNumberButton phoneNumber={row.phone_number} />
+                  </div>
+                </td>
+                <td className={tdClass}>
+                  {editingId === row.id ? (
+                    <input
+                      value={editLabel}
+                      onChange={(event) => setEditLabel(event.target.value)}
+                      onBlur={() => void saveLabel(row)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void saveLabel(row);
+                        }
+                        if (event.key === "Escape") {
+                          event.preventDefault();
+                          setEditingId(null);
+                        }
+                      }}
+                      placeholder="uhc"
+                      aria-label={`Label for ${row.phone_number}`}
+                      autoFocus
+                      className="h-8 w-40 rounded-md border border-accent/40 bg-bg px-2 text-sm outline-none"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => startEditingLabel(row)}
+                      title="Click to edit"
+                      className="rounded-md border border-transparent px-2 py-1 text-left text-sm hover:border-rule hover:bg-panel-hi/50"
+                    >
+                      {busy === row.id && editingId === null
+                        ? "Saving…"
+                        : (row.label ?? (
+                            <span className="text-muted">Add label</span>
+                          ))}
+                    </button>
+                  )}
+                </td>
+                <td className={tdClass}>{formatDate(row.created_at)}</td>
+                <td className={tdClass}>
+                  <button
+                    type="button"
+                    disabled={busy === row.id}
+                    onClick={() => void deleteNumber(row)}
+                    className="rounded-md border border-red-400/25 px-2.5 py-1.5 text-xs text-red-200 hover:bg-red-500/10 disabled:opacity-60"
+                  >
+                    {busy === row.id ? "Deleting…" : "Delete"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows === null && !error && <LoadingTable />}
+        {rows?.length === 0 && (
+          <EmptyTable message="No SMS inbox numbers yet. Provision one per portal." />
+        )}
+      </TableShell>
+
+    </div>
+  );
+}
+
+interface ApiKeyRow {
+  id: string;
+  name: string | null;
+  enabled: boolean;
+  last_request: string | null;
+  expires_at: string | null;
+  created_at: string;
+  creator: {
+    id: string;
+    name: string;
+    email: string;
+  };
+}
+
+interface CreatedApiKey {
+  id: string;
+  name: string | null;
+  key: string;
 }
 
 interface ApiKeyRow {
@@ -1733,7 +2086,7 @@ function ApiKeysTable({
       )}
 
       <TableShell>
-        <table className="w-full min-w-[820px] border-collapse">
+        <table className={`${tableClass} min-w-[820px]`}>
           <thead>
             <tr>
               <th className={thClass}>Name</th>
@@ -1765,7 +2118,7 @@ function ApiKeysTable({
                       type="button"
                       disabled={busy === row.id}
                       onClick={() => void remove(row)}
-                      className="rounded-md border border-red-400/25 px-2.5 py-1.5 text-xs text-red-200 hover:bg-red-500/10 disabled:opacity-60"
+                      className={tableDangerActionClass}
                     >
                       {busy === row.id ? "Deleting…" : "Delete"}
                     </button>
@@ -1819,7 +2172,7 @@ function BillingTable() {
         </p>
       )}
       <TableShell>
-        <table className="w-full min-w-[760px] border-collapse">
+        <table className={`${tableClass} min-w-[760px]`}>
           <thead>
             <tr>
               <th className={thClass}>Plan</th>
@@ -1893,6 +2246,359 @@ type CodeSharingStatus = {
   enabled: boolean;
 };
 
+type WebhookEndpoint = {
+  webhook_endpoint_id: string;
+  url: string;
+  description?: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+type WebhookCreateResponse = {
+  success: true;
+  webhook_endpoint_id: string;
+  message: string;
+  signing_secret?: string;
+};
+
+function WebhookSettingsPanel() {
+  const [endpoints, setEndpoints] = useState<WebhookEndpoint[] | null>(null);
+  const [editing, setEditing] = useState<WebhookEndpoint | "new" | null>(null);
+  const [url, setUrl] = useState("");
+  const [description, setDescription] = useState("");
+  const [signingSecret, setSigningSecret] = useState("");
+  const [active, setActive] = useState(true);
+  const [generatedSecret, setGeneratedSecret] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function refresh() {
+    const result = await orpcCall<{ webhook_endpoints: WebhookEndpoint[] }>(
+      "/v1/webhooks/list",
+    );
+    setEndpoints(result.webhook_endpoints);
+  }
+
+  async function refreshAfterMutation() {
+    try {
+      await refresh();
+    } catch {
+      setError(
+        "The change was saved, but the endpoint list could not be refreshed. Reload the page to see the latest state.",
+      );
+    }
+  }
+
+  useEffect(() => {
+    refresh().catch((err) =>
+      setError(
+        err instanceof Error ? err.message : "Could not load webhook endpoints.",
+      ),
+    );
+  }, []);
+
+  function startCreating() {
+    setEditing("new");
+    setUrl("");
+    setDescription("");
+    setSigningSecret("");
+    setActive(true);
+    setError(null);
+    setNotice(null);
+    setGeneratedSecret(null);
+  }
+
+  function startEditing(endpoint: WebhookEndpoint) {
+    setEditing(endpoint);
+    setUrl(endpoint.url);
+    setDescription(endpoint.description ?? "");
+    setSigningSecret("");
+    setActive(endpoint.active);
+    setError(null);
+    setNotice(null);
+    setGeneratedSecret(null);
+  }
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    if (!editing) return;
+    const id = editing === "new" ? "new" : editing.webhook_endpoint_id;
+    setBusy(id);
+    setError(null);
+    setNotice(null);
+    setGeneratedSecret(null);
+    try {
+      if (editing === "new") {
+        const result = await orpcCall<WebhookCreateResponse>(
+          "/v1/webhooks/create",
+          {
+            url: url.trim(),
+            description: description.trim(),
+            active,
+          },
+        );
+        setGeneratedSecret(result.signing_secret ?? null);
+        setNotice("Webhook endpoint added.");
+      } else {
+        await orpcCall("/v1/webhooks/update", {
+          id: editing.webhook_endpoint_id,
+          url: url.trim(),
+          description: description.trim(),
+          active,
+          ...(signingSecret ? { signing_secret: signingSecret } : {}),
+        });
+        setNotice("Webhook endpoint updated.");
+      }
+      setEditing(null);
+      setSigningSecret("");
+      await refreshAfterMutation();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not save webhook endpoint.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function remove(endpoint: WebhookEndpoint) {
+    if (!window.confirm(`Delete webhook endpoint “${endpoint.url}”?`)) return;
+    setBusy(endpoint.webhook_endpoint_id);
+    setError(null);
+    setNotice(null);
+    try {
+      await orpcCall("/v1/webhooks/delete", {
+        id: endpoint.webhook_endpoint_id,
+      });
+      if (
+        editing !== "new" &&
+        editing?.webhook_endpoint_id === endpoint.webhook_endpoint_id
+      ) {
+        setEditing(null);
+      }
+      setNotice("Webhook endpoint deleted.");
+      await refreshAfterMutation();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not delete webhook endpoint.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function copyGeneratedSecret() {
+    if (!generatedSecret) return;
+    await navigator.clipboard.writeText(generatedSecret);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
+  }
+
+  const inputClass =
+    "h-10 w-full rounded-md border border-rule bg-bg px-3 text-sm outline-none focus:border-accent";
+
+  return (
+    <section className="rounded-xl border border-rule bg-panel/65 p-5 shadow-[0_12px_40px_rgba(0,0,0,0.16)] sm:p-6">
+      <div>
+        <h2 className="text-base font-medium text-ink">Webhook endpoints</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+          Send completed workflow results to your application. Each request
+          includes a signature that your application can verify.
+        </p>
+        {editing === null && (
+          <button
+            type="button"
+            onClick={startCreating}
+            disabled={busy !== null}
+            className="mt-3 h-8 rounded-md border border-rule bg-bg/30 px-3 font-mono text-[10px] uppercase tracking-[0.08em] text-muted hover:border-accent/35 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Add endpoint
+          </button>
+        )}
+      </div>
+
+      {generatedSecret && (
+        <div className="mt-5 rounded-lg border border-accent/30 bg-green-3/25 p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-accent-bright">
+                Signing secret created
+              </p>
+              <p className="mt-1 text-xs leading-5 text-muted">
+                Copy it now. It will not be shown again.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setGeneratedSecret(null)}
+              aria-label="Dismiss signing secret"
+              className="text-sm text-muted hover:text-ink"
+            >
+              ×
+            </button>
+          </div>
+          <div className="mt-3 flex items-center gap-2 rounded-lg border border-rule bg-bg p-2">
+            <code className="min-w-0 flex-1 overflow-x-auto px-2 font-mono text-xs text-ink">
+              {generatedSecret}
+            </code>
+            <button
+              type="button"
+              onClick={() => void copyGeneratedSecret()}
+              className="libretto-button libretto-button--sm h-8"
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {editing && (
+        <form
+          onSubmit={save}
+          className="mt-4 space-y-4 rounded-lg border border-rule bg-bg/25 p-4"
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="sm:col-span-2">
+              <span className="mb-2 block text-xs uppercase text-muted">
+                Endpoint URL
+              </span>
+              <input
+                type="url"
+                value={url}
+                onChange={(event) => setUrl(event.target.value)}
+                placeholder="https://example.com/libretto-webhook"
+                required
+                autoFocus
+                className={inputClass}
+              />
+            </label>
+            <label className={editing === "new" ? "sm:col-span-2" : undefined}>
+              <span className="mb-2 block text-xs uppercase text-muted">
+                Description
+              </span>
+              <input
+                type="text"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="Production job results"
+                className={inputClass}
+              />
+            </label>
+            {editing !== "new" && (
+              <label>
+                <span className="mb-2 block text-xs uppercase text-muted">
+                  New signing secret
+                </span>
+                <input
+                  type="password"
+                  value={signingSecret}
+                  onChange={(event) => setSigningSecret(event.target.value)}
+                  placeholder="Leave blank to keep the current secret"
+                  className={inputClass}
+                />
+              </label>
+            )}
+          </div>
+          <label className="flex w-fit items-center gap-2 text-sm text-muted">
+            <input
+              type="checkbox"
+              checked={active}
+              onChange={(event) => setActive(event.target.checked)}
+              className="size-4 accent-green-7"
+            />
+            Deliver workflow results to this endpoint
+          </label>
+          <div className="flex gap-2">
+            <button
+              disabled={busy !== null}
+              className="h-9 rounded-md border border-accent/35 bg-green-9/25 px-3 text-sm text-ink hover:bg-green-9/45 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy !== null
+                ? "Saving…"
+                : editing === "new"
+                  ? "Add endpoint"
+                  : "Save changes"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(null)}
+              disabled={busy !== null}
+              className="h-9 px-3 text-sm text-muted disabled:opacity-60"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      {error && (
+        <p className="mt-5 rounded-md border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p
+          role="status"
+          aria-live="polite"
+          className="mt-5 rounded-md border border-accent/30 bg-green-9/10 px-4 py-3 text-sm text-accent-bright"
+        >
+          {notice}
+        </p>
+      )}
+
+      <div className="mt-5 divide-y divide-rule border-y border-rule">
+        {endpoints?.map((endpoint) => (
+          <div
+            key={endpoint.webhook_endpoint_id}
+            className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="truncate font-mono text-xs text-ink">
+                  {endpoint.url}
+                </p>
+                <StatusBadge status={endpoint.active ? "active" : "disabled"} />
+              </div>
+              <p className="mt-1 text-xs text-muted">
+                {endpoint.description || `Updated ${formatDate(endpoint.updated_at)}`}
+              </p>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <button
+                type="button"
+                onClick={() => startEditing(endpoint)}
+                disabled={busy !== null}
+                className="rounded-md border border-rule px-2.5 py-1.5 text-xs text-muted hover:border-accent/35 hover:text-ink disabled:opacity-60"
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => void remove(endpoint)}
+                disabled={busy !== null}
+                className={tableDangerActionClass}
+              >
+                {busy === endpoint.webhook_endpoint_id ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        ))}
+        {endpoints === null && !error && (
+          <p className="py-5 text-sm text-muted">Loading webhook endpoints…</p>
+        )}
+        {endpoints?.length === 0 && (
+          <p className="py-5 text-sm text-muted">No webhook endpoints configured.</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function SettingsPanel({ session }: { session: CloudSession }) {
   const [sharing, setSharing] = useState<CodeSharingStatus | null>(null);
   const [canManage, setCanManage] = useState<boolean | null>(null);
@@ -1930,12 +2636,10 @@ function SettingsPanel({ session }: { session: CloudSession }) {
   async function toggleSharing() {
     if (!sharing || !canManage) return;
     const enabled = !sharing.enabled;
-    if (
-      !enabled &&
-      !window.confirm(
-        "Disable public workflow sharing? Every workflow from this workspace will be removed from the marketplace. Re-enabling sharing will not republish them automatically.",
-      )
-    ) {
+    const confirmation = enabled
+      ? "Enable public workflow sharing? Workspace members will be able to share workflows with a public API and visible source. Existing workflows remain private until explicitly shared."
+      : "Disable public workflow sharing? Every public workflow API and source listing from this workspace will be removed. Re-enabling sharing will not restore them automatically.";
+    if (!window.confirm(confirmation)) {
       return;
     }
 
@@ -1950,8 +2654,8 @@ function SettingsPanel({ session }: { session: CloudSession }) {
       setSharing(updated);
       setNotice(
         enabled
-          ? "Workflow sharing is enabled. Workflows remain private until someone explicitly shares them."
-          : "Workflow sharing is disabled and existing marketplace listings were unpublished.",
+          ? "Public sharing is enabled. Workflows remain private until someone explicitly shares them."
+          : "Public sharing is disabled and existing public workflow APIs and source listings were removed.",
       );
     } catch (err) {
       setError(
@@ -1983,21 +2687,28 @@ function SettingsPanel({ session }: { session: CloudSession }) {
           {notice}
         </p>
       )}
-      <section className="rounded-xl border border-rule bg-panel/65 p-5 shadow-[0_12px_40px_rgba(0,0,0,0.16)] sm:p-6">
-        <div className="flex items-start justify-between gap-6">
-          <div>
-            <h2 className="text-base font-medium text-ink">
-              Public workflow sharing
-            </h2>
-            <p
-              id="workflow-sharing-description"
-              className="mt-2 max-w-2xl text-sm leading-6 text-muted"
-            >
-              Allow people in this workspace to publish workflow source code
-              to the Libretto Marketplace. Credentials, run history, and
-              per-run parameters are never included.
-            </p>
-          </div>
+      <WebhookSettingsPanel />
+      <details className="group rounded-xl border border-rule bg-panel/65 shadow-[0_12px_40px_rgba(0,0,0,0.16)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 sm:p-6">
+          <h2 className="text-base font-medium text-ink">
+            Public workflow sharing
+          </h2>
+          <span
+            aria-hidden="true"
+            className="text-xs text-muted transition-transform group-open:rotate-180"
+          >
+            ↓
+          </span>
+        </summary>
+        <div className="border-t border-rule px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
+          <p
+            id="workflow-sharing-description"
+            className="max-w-2xl text-sm leading-6 text-muted"
+          >
+            Allow workspace members to share workflows with people outside
+            this workspace. Each publication includes a Hosted workflow API
+            and reviewed source code.
+          </p>
           <button
             type="button"
             role="switch"
@@ -2007,47 +2718,42 @@ function SettingsPanel({ session }: { session: CloudSession }) {
             aria-describedby="workflow-sharing-description workflow-sharing-state"
             disabled={!sharing || canManage !== true || busy}
             onClick={() => void toggleSharing()}
-            className={`relative mt-1 h-7 w-12 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50 ${
+            className={`mt-4 inline-flex h-8 min-w-24 items-center justify-center rounded-md border px-3 font-mono text-[10px] uppercase tracking-[0.08em] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
               sharing?.enabled
-                ? "border-accent/50 bg-green-9"
-                : "border-rule bg-bg"
+                ? "border-accent/45 bg-green-9/35 text-accent-bright hover:bg-green-9/50"
+                : "border-rule bg-bg/40 text-muted hover:border-accent/30 hover:text-ink"
             }`}
           >
-            <span
-              className={`absolute top-0.5 size-5 rounded-full bg-ink transition-transform ${
-                sharing?.enabled ? "translate-x-6" : "translate-x-0.5"
-              }`}
-            />
+            {sharing?.enabled ? "Enabled" : "Disabled"}
           </button>
+          <div
+            id="workflow-sharing-state"
+            className="mt-5 border-t border-rule pt-4 text-xs leading-5 text-muted"
+          >
+            {!sharing
+              ? error
+                ? "Sharing status is unavailable."
+                : "Loading sharing status…"
+              : sharing.enabled
+                ? "Enabled · Workflows can be shared outside this workspace, but remain private by default."
+                : "Disabled · Workflows cannot be shared outside this workspace."}
+            {sharing && canManage === null && (
+              <span className="mt-1 block">Checking workspace permissions…</span>
+            )}
+            {sharing && canManage === false && (
+              <span className="mt-1 block">
+                Only a workspace owner can change this setting.
+              </span>
+            )}
+            {sharing?.enabled && (
+              <span className="mt-1 block">
+                Disabling this setting removes every current public API and
+                source listing. Re-enabling it does not restore previous listings.
+              </span>
+            )}
+          </div>
         </div>
-        <div
-          id="workflow-sharing-state"
-          className="mt-5 border-t border-rule pt-4 text-xs leading-5 text-muted"
-        >
-          {!sharing
-            ? error
-              ? "Sharing status is unavailable."
-              : "Loading sharing status…"
-            : sharing.enabled
-              ? "Enabled · Individual workflows are still private by default and must be shared explicitly."
-              : "Disabled · Workflows from this workspace cannot be published."}
-          {sharing && canManage === null && (
-            <span className="mt-1 block">Checking workspace permissions…</span>
-          )}
-          {sharing && canManage === false && (
-            <span className="mt-1 block">
-              Only a workspace owner can change this setting.
-            </span>
-          )}
-          {sharing?.enabled && (
-            <span className="mt-1 block">
-              Disabling this setting unpublishes every current listing.
-              Re-enabling it does not automatically republish previous
-              listings.
-            </span>
-          )}
-        </div>
-      </section>
+      </details>
     </div>
   );
 }
@@ -2061,7 +2767,9 @@ export function AuthenticatedDashboardPage({
   const [checking, setChecking] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
   const [showCreateSecret, setShowCreateSecret] = useState(false);
+  const [showCreatePhoneNumber, setShowCreatePhoneNumber] = useState(false);
   const [showCreateKey, setShowCreateKey] = useState(false);
+  const [hasConnectedRepos, setHasConnectedRepos] = useState(false);
   useEffect(() => {
     getCloudSession()
       .then(async (result) => {
@@ -2088,7 +2796,7 @@ export function AuthenticatedDashboardPage({
       </div>
     );
   const action =
-    section === "connected_repos" ? (
+    section === "connected_repos" && hasConnectedRepos ? (
       <a
         href={GITHUB_APP_INSTALL_URL}
         className="libretto-button libretto-button--default inline-flex h-10 items-center no-underline"
@@ -2111,6 +2819,14 @@ export function AuthenticatedDashboardPage({
       >
         Add secret
       </button>
+    ) : section === "phone_numbers" ? (
+      <button
+        type="button"
+        onClick={() => setShowCreatePhoneNumber(true)}
+        className="libretto-button libretto-button--default h-10"
+      >
+        Add phone number
+      </button>
     ) : section === "api_keys" ? (
       <button
         type="button"
@@ -2128,7 +2844,11 @@ export function AuthenticatedDashboardPage({
       {section === "schedules" && <SchedulesTable />}
       {section === "workflow_runs" && <WorkflowRunsTable />}
       {section === "browser_sessions" && <BrowserSessionsTable />}
-      {section === "connected_repos" && <ConnectedReposTable />}
+      {section === "connected_repos" && (
+        <ConnectedReposTable
+          onHasRepositoriesChange={setHasConnectedRepos}
+        />
+      )}
       {section === "users" && (
         <UsersTable
           session={session}
@@ -2141,6 +2861,12 @@ export function AuthenticatedDashboardPage({
         <SecretsTable
           showCreate={showCreateSecret}
           onCloseCreate={() => setShowCreateSecret(false)}
+        />
+      )}
+      {section === "phone_numbers" && (
+        <PhoneNumbersTable
+          showCreate={showCreatePhoneNumber}
+          onCloseCreate={() => setShowCreatePhoneNumber(false)}
         />
       )}
       {section === "api_keys" && (

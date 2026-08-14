@@ -4,8 +4,14 @@ import {
 	browserTaskPrompt,
 	createPiSession,
 	runPrompt,
-	type SessionRun,
+	SessionRunError,
+	usageMetrics,
 } from "../agent.js";
+import {
+	HarnessRunError,
+	harnessRunFromPiSession,
+	type HarnessRun,
+} from "../harness-run.js";
 
 export async function runBrowserTask(options: {
 	task: string;
@@ -13,7 +19,7 @@ export async function runBrowserTask(options: {
 	customTools?: ToolDefinition[];
 	skillPaths?: string[];
 	appendSystemPrompt?: string[];
-}): Promise<SessionRun> {
+}): Promise<HarnessRun> {
 	const session = await createPiSession({
 		workspace: options.workspace,
 		sessionFile: join(options.workspace, "session.jsonl"),
@@ -21,5 +27,20 @@ export async function runBrowserTask(options: {
 		skillPaths: options.skillPaths,
 		appendSystemPrompt: options.appendSystemPrompt,
 	});
-	return await runPrompt(session, browserTaskPrompt({ task: options.task }));
+	try {
+		const run = await runPrompt(
+			session,
+			browserTaskPrompt({ task: options.task }),
+		);
+		return harnessRunFromPiSession(run, usageMetrics(run));
+	} catch (error) {
+		if (error instanceof SessionRunError) {
+			throw new HarnessRunError(
+				error,
+				harnessRunFromPiSession(error.run, usageMetrics(error.run)),
+			);
+		}
+		session.dispose();
+		throw error;
+	}
 }
