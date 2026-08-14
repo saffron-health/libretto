@@ -128,6 +128,44 @@ function readPackageManifest(path: string): PackageManifest {
   return readJsonFile<PackageManifest>(path);
 }
 
+function resolveInstalledPackageVersion(
+  sourceDir: string,
+  packageName: string,
+): string | null {
+  let currentDir: string;
+  try {
+    const sourceRequire = createRequire(
+      join(resolve(sourceDir), "package.json"),
+    );
+    currentDir = dirname(sourceRequire.resolve(packageName));
+  } catch {
+    return null;
+  }
+
+  while (true) {
+    const manifestPath = join(currentDir, "package.json");
+    if (existsSync(manifestPath)) {
+      const manifest = readPackageManifest(manifestPath);
+      if (manifest.name === packageName) {
+        return manifest.version ?? null;
+      }
+    }
+    if (isRootPath(currentDir)) return null;
+    currentDir = dirname(currentDir);
+  }
+}
+
+function supportsHostedRuntimeAuth(version: string | null): boolean {
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/.exec(version ?? "");
+  if (!match) return false;
+  const [, major = "0", minor = "0", patch = "0"] = match;
+  return (
+    Number(major) > 0 ||
+    Number(minor) > 6 ||
+    (Number(minor) === 6 && Number(patch) >= 44)
+  );
+}
+
 function ensureSourcePackageManifest(sourceDir: string): PackageManifest {
   const pkgJsonPath = join(sourceDir, "package.json");
   if (!existsSync(pkgJsonPath)) {
@@ -1013,6 +1051,7 @@ function discoverBundledWorkflows(args: {
 function createBootstrapSource(args: {
   bundleBuffer: Buffer;
   deploymentName: string;
+  runtimeSupportsHostedAuth: boolean;
   workflows: readonly WorkflowDeployMetadata[];
 }): string {
   const bundleHash = createHash("sha256")
@@ -1048,6 +1087,10 @@ import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 
 const LIBRETTO_WORKFLOW_BRAND = Symbol.for("libretto.workflow");
+const LIBRETTO_WORKFLOW_RUNTIME_AUTH_BRAND = Symbol.for(
+  "libretto.workflow.runtime-auth",
+);
+const RUNTIME_SUPPORTS_HOSTED_AUTH = ${JSON.stringify(args.runtimeSupportsHostedAuth)};
 
 const BUNDLE_HASH = ${JSON.stringify(bundleHash)};
 const BUNDLE_GZIP_BASE64 = ${JSON.stringify(bundleBase64)};
@@ -1138,6 +1181,19 @@ function findWorkflow(moduleExports, workflowName) {
   return null;
 }
 
+function withoutLibrettoRuntime(input) {
+  if (
+    !input ||
+    typeof input !== "object" ||
+    Array.isArray(input) ||
+    !Object.prototype.hasOwnProperty.call(input, "__libretto")
+  ) {
+    return input;
+  }
+  const { __libretto: _runtime, ...withoutRuntime } = input;
+  return withoutRuntime;
+}
+
 function createWorkflowProxy(workflowName, metadata) {
   return {
     [LIBRETTO_WORKFLOW_BRAND]: true,
@@ -1157,7 +1213,12 @@ function createWorkflowProxy(workflowName, metadata) {
           \`Expected exported workflow "\${workflowName}" to be available in the bundled deployment implementation.\`,
         );
       }
-      return await target.run(ctx, input);
+      const targetInput =
+        RUNTIME_SUPPORTS_HOSTED_AUTH ||
+        target[LIBRETTO_WORKFLOW_RUNTIME_AUTH_BRAND] === true
+          ? input
+          : withoutLibrettoRuntime(input);
+      return await target.run(ctx, targetInput);
     },
   };
 }
@@ -1270,6 +1331,9 @@ async function writeBundledDeployEntrypoint(args: {
       createBootstrapSource({
         bundleBuffer: Buffer.from(bundledImplementation.contents),
         deploymentName: args.deploymentName,
+        runtimeSupportsHostedAuth: supportsHostedRuntimeAuth(
+          resolveInstalledPackageVersion(args.absSourceDir, "libretto"),
+        ),
         workflows,
       }),
     );

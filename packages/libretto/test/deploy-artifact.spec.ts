@@ -98,6 +98,53 @@ describe("createHostedDeployPackage", () => {
     return workspaceRoot;
   }
 
+  function installFixtureLibretto(args: {
+    runtimeAuth: boolean;
+    version: string;
+    workspaceRoot: string;
+  }): void {
+    const packageDir = join(args.workspaceRoot, "node_modules", "libretto");
+    rmSync(packageDir, { force: true, recursive: true });
+    mkdirSync(packageDir, { recursive: true });
+    writeJson(join(packageDir, "package.json"), {
+      name: "libretto",
+      version: args.version,
+      type: "module",
+      exports: "./index.js",
+    });
+    writeFileSync(
+      join(packageDir, "index.js"),
+      [
+        'const WORKFLOW_BRAND = Symbol.for("libretto.workflow");',
+        "",
+        "export function workflow(name, definitionOrHandler) {",
+        "  const definition = typeof definitionOrHandler === \"function\"",
+        "    ? { handler: definitionOrHandler }",
+        "    : definitionOrHandler;",
+        "  return {",
+        "    [WORKFLOW_BRAND]: true,",
+        "    name,",
+        "    credentialNames: [],",
+        "    async run(ctx, input) {",
+        ...(args.runtimeAuth
+          ? [
+              "      const { __libretto: runtime, ...handlerInput } = input;",
+              "      return definition.handler(ctx, handlerInput, runtime);",
+            ]
+          : [
+              "      if (definition.strictInput && Object.keys(input).some((key) => key !== \"value\")) {",
+              '        throw new Error(`Unknown input keys: ${Object.keys(input).join(",")}`);',
+              "      }",
+              "      return definition.handler(ctx, input);",
+            ]),
+        "    },",
+        "  };",
+        "}",
+        "",
+      ].join("\n"),
+    );
+  }
+
   function trackDeployPackage(
     deployPackage: Awaited<ReturnType<typeof createHostedDeployPackage>>,
   ): Awaited<ReturnType<typeof createHostedDeployPackage>> {
@@ -563,6 +610,134 @@ describe("createHostedDeployPackage", () => {
         }),
       }),
     );
+  });
+
+  it("strips hosted runtime auth before invoking a legacy Libretto runtime", async () => {
+    const workspaceRoot = createWorkspaceRoot();
+    installFixtureLibretto({
+      runtimeAuth: false,
+      version: "0.6.43",
+      workspaceRoot,
+    });
+    const sourceDir = join(workspaceRoot, "apps", "worker");
+    const entryPoint = join(sourceDir, "src", "workflow.ts");
+    const outfile = join(workspaceRoot, "legacy-deployment.cjs");
+
+    mkdirSync(join(sourceDir, "src"), { recursive: true });
+    writeJson(join(sourceDir, "package.json"), {
+      name: "@repo/worker",
+      private: true,
+      type: "module",
+      dependencies: { libretto: "0.6.43" },
+    });
+    writeFileSync(
+      entryPoint,
+      [
+        'import { workflow } from "libretto";',
+        "",
+        'export const strictWorkflow = workflow("strictWorkflow", {',
+        "  strictInput: true,",
+        "  handler: async (_ctx, input) => ({",
+        "    value: input.value,",
+        '    hasRuntime: Object.hasOwn(input, "__libretto"),',
+        "  }),",
+        "});",
+        "",
+        'export const schemaLessWorkflow = workflow("schemaLessWorkflow", async (_ctx, input) => ({',
+        '  hasRuntime: Object.hasOwn(input, "__libretto"),',
+        "}));",
+        "",
+      ].join("\n"),
+    );
+
+    const deployPackage = trackDeployPackage(
+      await createHostedDeployPackage({
+        deploymentName: "legacy-worker",
+        entryPoint,
+        sourceDir,
+      }),
+    );
+    const deployed = await rebundleDeployEntrypointToCjs({
+      deployPackage,
+      outfile,
+    });
+    const workflowExport = (name: string) => {
+      const index = deployPackage.workflows.findIndex(
+        (workflow) => workflow.name === name,
+      );
+      return deployed[`workflow_${index}`];
+    };
+    const hostedInput = {
+      value: "accepted",
+      __libretto: {
+        job: {
+          apiUrl: "https://api.hosted.test",
+          jobId: "job-1",
+          token: "hosted-job-token",
+        },
+      },
+    };
+
+    await expect(
+      workflowExport("strictWorkflow")?.run?.({}, hostedInput),
+    ).resolves.toEqual({ value: "accepted", hasRuntime: false });
+    await expect(
+      workflowExport("schemaLessWorkflow")?.run?.({}, hostedInput),
+    ).resolves.toEqual({ hasRuntime: false });
+  });
+
+  it("forwards hosted runtime auth to released Libretto 0.6.44", async () => {
+    const workspaceRoot = createWorkspaceRoot();
+    installFixtureLibretto({
+      runtimeAuth: true,
+      version: "0.6.44",
+      workspaceRoot,
+    });
+    const sourceDir = join(workspaceRoot, "apps", "worker");
+    const entryPoint = join(sourceDir, "src", "workflow.ts");
+    const outfile = join(workspaceRoot, "released-auth-deployment.cjs");
+
+    mkdirSync(join(sourceDir, "src"), { recursive: true });
+    writeJson(join(sourceDir, "package.json"), {
+      name: "@repo/worker",
+      private: true,
+      type: "module",
+      dependencies: { libretto: "0.6.44" },
+    });
+    writeFileSync(
+      entryPoint,
+      [
+        'import { workflow } from "libretto";',
+        "",
+        'export const authWorkflow = workflow("authWorkflow", async (_ctx, input, runtime) => ({',
+        '  hasRuntimeInput: Object.hasOwn(input, "__libretto"),',
+        "  token: runtime?.job?.token,",
+        "}));",
+        "",
+      ].join("\n"),
+    );
+
+    const deployPackage = trackDeployPackage(
+      await createHostedDeployPackage({
+        deploymentName: "released-auth-worker",
+        entryPoint,
+        sourceDir,
+      }),
+    );
+    const deployed = await rebundleDeployEntrypointToCjs({
+      deployPackage,
+      outfile,
+    });
+
+    await expect(
+      deployed.workflow_0?.run?.(
+        {},
+        { __libretto: { job: { token: "hosted-job-token" } } },
+      ),
+    ).resolves.toEqual({
+      hasRuntimeInput: false,
+      token: "hosted-job-token",
+    });
   });
 
   it("rejects externalizing the deployment-selected Libretto", async () => {
