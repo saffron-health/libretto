@@ -641,7 +641,7 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
                   Share workflow outside this workspace
                 </span>
                 <span className="mt-1 block text-xs text-muted">
-                  Share a public run API with visible, reusable source code.
+                  Share a public run API with source code for signed-in users.
                 </span>
               </span>
               <span className="text-xs text-muted" aria-hidden>

@@ -10,6 +10,7 @@ import { Footer } from "./components/Footer";
 import { Navbar } from "./components/Navbar";
 import { Text } from "./components/Text";
 import {
+  authGet,
   getAuthStatus,
   getCloudSession,
   orpcCall,
@@ -35,10 +36,11 @@ export type HostedWorkflowSummary = {
 type HostedWorkflowDetail = HostedWorkflowSummary & {
   input_schema: unknown;
   output_schema: unknown;
-  source_share_id: string;
-  credential_names: string[];
-  import_available: boolean;
-  files: Array<{ file_name: string; code: string }>;
+  source_access: "granted" | "sign_in_required";
+  source_share_id?: string;
+  credential_names?: string[];
+  import_available?: boolean;
+  files?: Array<{ file_name: string; code: string }>;
 };
 
 type SecretRow = {
@@ -299,7 +301,7 @@ function buildHostedAgentPrompt(workflow: HostedWorkflowDetail): string {
         ].join("\n");
 
   return [
-    "Use this published Libretto workflow through its hosted API or adapt its public source code.",
+    "Use this published Libretto workflow through its hosted API. Sign in to Libretto to review or adapt its source code.",
     "",
     `Hosted workflow: ${hostedKey(workflow)}`,
     workflow.description?.trim()
@@ -599,7 +601,7 @@ export function HostedWorkflowsPage() {
         </Text>
         <Text as="p" size="md" className="mt-5 max-w-xl leading-7 text-muted">
           Public run endpoints you call with your own API key. Input and output
-          types and reviewed source code are included on every listing.
+          types are public; sign in to review source code and clone a workflow.
         </Text>
       </header>
 
@@ -666,7 +668,7 @@ export function HostedWorkflowsPage() {
             </h2>
             <Text as="p" size="sm" className="mt-3 line-clamp-3 leading-6 text-muted">
               {workflow.description?.trim() ||
-                "A published Libretto workflow you can call or adapt from its source."}
+                "A published Libretto workflow you can call now or clone after signing in."}
             </Text>
           </a>
         ))}
@@ -696,7 +698,7 @@ export function HostedWorkflowPage({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    publicCloudGet<HostedWorkflowDetail>(
+    authGet<HostedWorkflowDetail>(
       `/hosted-workflows/${encodeURIComponent(tenantSlug)}/${encodeURIComponent(workflowName)}/data`,
     )
       .then(setWorkflow)
@@ -746,17 +748,17 @@ export function HostedWorkflowPage({
   );
   const secretsNeedingValues = useMemo(
     () =>
-      workflow?.credential_names.filter((name) => !savedSecrets.has(name)) ?? [],
+      workflow?.credential_names?.filter((name) => !savedSecrets.has(name)) ?? [],
     [savedSecrets, workflow],
   );
 
   async function deployOwnCopy() {
-    if (!workflow) return;
+    if (!workflow?.source_share_id) return;
     setBusy(true);
     setError(null);
     try {
       const credentialIds: string[] = [];
-      for (const name of workflow.credential_names) {
+      for (const name of workflow.credential_names ?? []) {
         const saved = savedSecrets.get(name);
         if (saved) {
           credentialIds.push(saved.credential_id);
@@ -824,6 +826,8 @@ export function HostedWorkflowPage({
   const prompt = buildHostedAgentPrompt(workflow);
   const runUrl = `${cloudApiUrl}/v1/hosted-workflows/run/${encodeURIComponent(workflow.tenant_slug)}/${encodeURIComponent(workflow.workflow_name)}`;
   const returnTo = hostedPath(workflow);
+  const canViewSource = workflow.source_access === "granted";
+  const showSource = canViewSource && activeView === "source";
 
   return pageShell(
     <>
@@ -851,35 +855,37 @@ export function HostedWorkflowPage({
         </Text>
       </header>
 
-      <div
-        role="tablist"
-        aria-label="Workflow details"
-        className="mt-8 grid max-w-md grid-cols-2 gap-1 rounded-lg border border-rule bg-panel p-1"
-      >
-        {(["api", "source"] as const).map((view) => {
-          const selected = activeView === view;
-          return (
-            <button
-              key={view}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              onClick={() => setActiveView(view)}
-              className={`rounded-md border px-5 py-3 font-mono text-xs uppercase tracking-[0.1em] transition ${
-                selected
-                  ? "border-accent/35 bg-accent/[0.12] text-accent-bright shadow-[inset_0_0_18px_rgba(18,206,65,0.06)]"
-                  : "border-transparent text-muted hover:bg-panel-hi hover:text-ink"
-              }`}
-            >
-              {view === "api" ? "API spec" : "Source code"}
-            </button>
-          );
-        })}
-      </div>
+      {canViewSource && (
+        <div
+          role="tablist"
+          aria-label="Workflow details"
+          className="mt-8 grid max-w-md grid-cols-2 gap-1 rounded-lg border border-rule bg-panel p-1"
+        >
+          {(["api", "source"] as const).map((view) => {
+            const selected = activeView === view;
+            return (
+              <button
+                key={view}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => setActiveView(view)}
+                className={`rounded-md border px-5 py-3 font-mono text-xs uppercase tracking-[0.1em] transition ${
+                  selected
+                    ? "border-accent/35 bg-accent/[0.12] text-accent-bright shadow-[inset_0_0_18px_rgba(18,206,65,0.06)]"
+                    : "border-transparent text-muted hover:bg-panel-hi hover:text-ink"
+                }`}
+              >
+                {view === "api" ? "API spec" : "Source code"}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
         <div className="min-w-0 space-y-6">
-          {activeView === "api" ? (
+          {!showSource ? (
             <>
               <EndpointBar method="POST" url={runUrl} />
 
@@ -921,7 +927,7 @@ export function HostedWorkflowPage({
               <SectionHeading title="Workflow code">
                 Review or adapt the source included with this shared workflow.
               </SectionHeading>
-              <SourceBrowser files={workflow.files} />
+              <SourceBrowser files={workflow.files ?? []} />
             </section>
           )}
         </div>
@@ -932,10 +938,13 @@ export function HostedWorkflowPage({
               Use this workflow
             </p>
             <p className="mt-1.5 text-xs leading-5 text-muted">
-              Call the API directly or deploy your own copy.
+              {canViewSource
+                ? "Call the API directly or deploy your own copy."
+                : "Call the hosted API now. Sign up to inspect the source and clone your own copy."}
             </p>
             <Button
               type="button"
+              variant={canViewSource ? undefined : "outline"}
               className="mt-4 w-full"
               data-fathom-event="Hosted workflows copy agent prompt"
               onClick={() => {
@@ -946,18 +955,18 @@ export function HostedWorkflowPage({
             >
               {copied ? "Copied" : "Prompt to use the hosted API"}
             </Button>
-            {!session && (
+            {!canViewSource && (
               <Button
-                href={withReturnTo("/signin", returnTo)}
-                variant="secondary"
+                href={withReturnTo("/signin?mode=signup", returnTo)}
                 className="mt-3 w-full"
               >
-                Sign up to generate an API key
+                Sign up to view source and clone
               </Button>
             )}
 
-            <div className="mt-3">
-              {build ? (
+            {canViewSource && (
+              <div className="mt-3">
+                {build ? (
                 <>
                   <p className="mt-1.5 text-xs leading-5 text-muted">
                     {build.status === "deploying"
@@ -978,7 +987,7 @@ export function HostedWorkflowPage({
                     Add the credentials needed by your copy.
                   </p>
                   <div className="mt-3 space-y-3">
-                    {workflow.credential_names.map((name) => {
+                    {(workflow.credential_names ?? []).map((name) => {
                       const saved = savedSecrets.has(name);
                       return (
                         <label key={name} className="block">
@@ -1049,8 +1058,9 @@ export function HostedWorkflowPage({
                     </p>
                   )}
                 </>
-              )}
-            </div>
+                )}
+              </div>
+            )}
             {error && <p className="mt-3 text-xs leading-5 text-red-200">{error}</p>}
           </div>
         </aside>
