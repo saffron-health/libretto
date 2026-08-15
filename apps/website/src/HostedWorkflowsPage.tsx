@@ -940,12 +940,12 @@ export function HostedWorkflowPage({
             <p className="mt-1.5 text-xs leading-5 text-muted">
               {canViewSource
                 ? "Call the API directly or deploy your own copy."
-                : "Call the hosted API now. Sign up to inspect the source and clone your own copy."}
+                : "Call the API now. Sign up to view the source and clone it."}
             </p>
             <Button
               type="button"
               variant={canViewSource ? undefined : "outline"}
-              className="mt-4 w-full"
+              className="mt-4 w-full !min-w-0"
               data-fathom-event="Hosted workflows copy agent prompt"
               onClick={() => {
                 void navigator.clipboard.writeText(prompt).catch(() => {});
@@ -953,14 +953,14 @@ export function HostedWorkflowPage({
                 window.setTimeout(() => setCopied(false), 1500);
               }}
             >
-              {copied ? "Copied" : "Prompt to use the hosted API"}
+              {copied ? "Copied" : "Copy API prompt"}
             </Button>
             {!canViewSource && (
               <Button
                 href={withReturnTo("/signin?mode=signup", returnTo)}
-                className="mt-3 w-full"
+                className="mt-3 w-full !min-w-0"
               >
-                Sign up to view source and clone
+                Sign up to view source
               </Button>
             )}
 
