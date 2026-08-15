@@ -2637,7 +2637,7 @@ function SettingsPanel({ session }: { session: CloudSession }) {
     if (!sharing || !canManage) return;
     const enabled = !sharing.enabled;
     const confirmation = enabled
-      ? "Enable public workflow sharing? Workspace members will be able to share workflows with a public API and visible source. Existing workflows remain private until explicitly shared."
+      ? "Enable public workflow sharing? Workspace members will be able to share workflows with a public API and source visible to signed-in users. Existing workflows remain private until explicitly shared."
       : "Disable public workflow sharing? Every public workflow API and source listing from this workspace will be removed. Re-enabling sharing will not restore them automatically.";
     if (!window.confirm(confirmation)) {
       return;
@@ -2707,7 +2707,7 @@ function SettingsPanel({ session }: { session: CloudSession }) {
           >
             Allow workspace members to share workflows with people outside
             this workspace. Each publication includes a Hosted workflow API
-            and reviewed source code.
+            and reviewed source code for signed-in users.
           </p>
           <button
             type="button"
