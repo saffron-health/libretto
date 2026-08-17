@@ -7,7 +7,6 @@ import {
   useState,
 } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Pane } from "tweakpane";
 import { ArrowUpIcon } from "../icons/ArrowUpIcon";
 import { ArrowDownIcon } from "../icons/ArrowDownIcon";
 import { ArrowLeftIcon } from "../icons/ArrowLeftIcon";
@@ -706,6 +705,27 @@ export function CanvasAsciihedron({
   const containerRef = useRef<HTMLDivElement>(null);
   const localCanvasRef = useRef<HTMLCanvasElement>(null);
   const canvasRef = canvasRefProp ?? localCanvasRef;
+  const [PaneCtor, setPaneCtor] = useState<
+    typeof import("tweakpane").Pane | null
+  >(null);
+
+  useEffect(() => {
+    if (!paneUnlocked || PaneCtor) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void import("tweakpane").then(({ Pane }) => {
+      if (!cancelled) {
+        setPaneCtor(() => Pane);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [PaneCtor, paneUnlocked]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -782,7 +802,7 @@ export function CanvasAsciihedron({
     const spinAxis = normalize(applyRotation([0, 1, 0], rotation));
 
     let paneContainer: HTMLDivElement | null = null;
-    if (paneUnlocked) {
+    if (paneUnlocked && PaneCtor) {
       paneContainer = document.createElement("div");
       paneContainer.style.cssText =
         "position:fixed;bottom:16px;left:16px;z-index:50;opacity:0;transform:translateY(8px);transition:opacity 0.3s ease,transform 0.3s ease;";
@@ -797,7 +817,9 @@ export function CanvasAsciihedron({
       });
     }
     const pane = paneContainer
-      ? new Pane({ title: "Asciihedron", container: paneContainer })
+      ? PaneCtor
+        ? new PaneCtor({ title: "Asciihedron", container: paneContainer })
+        : null
       : null;
 
     if (pane && onClosePane) {
@@ -1357,6 +1379,7 @@ export function CanvasAsciihedron({
       cancelAnimationFrame(frameId);
       pane?.dispose();
       paneContainer?.remove();
+      paneContainer = null;
       resizeObserver.disconnect();
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointercancel", deactivatePointer);
@@ -1371,6 +1394,7 @@ export function CanvasAsciihedron({
     baseOpacityProp,
     flatOpacity,
     paneUnlocked,
+    PaneCtor,
     onClosePane,
   ]);
 
