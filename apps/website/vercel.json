@@ -3,8 +3,18 @@
   "outputDirectory": "dist/client",
   "redirects": [
     {
+      "source": "/hosted-workflows",
+      "destination": "/workflow-catalogue",
+      "permanent": true
+    },
+    {
+      "source": "/hosted-workflows/:tenantSlug/:workflowName",
+      "destination": "/workflow-catalogue/:tenantSlug/:workflowName",
+      "permanent": true
+    },
+    {
       "source": "/marketplace",
-      "destination": "/open-workflows",
+      "destination": "/workflow-catalogue",
       "permanent": true
     },
     {
@@ -69,8 +79,8 @@
   ],
   "rewrites": [
     {
-      "source": "/hosted-workflows/:tenantSlug/:workflowName",
-      "destination": "/hosted-workflows"
+      "source": "/workflow-catalogue/:tenantSlug/:workflowName",
+      "destination": "/workflow-catalogue"
     },
     {
       "source": "/open-workflows/:id",

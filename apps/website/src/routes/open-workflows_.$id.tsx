@@ -22,7 +22,7 @@ function OpenWorkflowRoute() {
           throw new Error("This workflow does not have a public publisher slug.");
         }
         window.location.replace(
-          `/hosted-workflows/${encodeURIComponent(workflow.publisher_slug)}/${encodeURIComponent(workflow.workflow_name)}`,
+          `/workflow-catalogue/${encodeURIComponent(workflow.publisher_slug)}/${encodeURIComponent(workflow.workflow_name)}`,
         );
       })
       .catch((cause) =>
