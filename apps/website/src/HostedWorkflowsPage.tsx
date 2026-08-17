@@ -1044,7 +1044,7 @@ export function HostedWorkflowPage({
                     variant="outline"
                     onClick={startDeployingOwnCopy}
                     disabled={!workflow.import_available || busy}
-                    className="w-full"
+                    className="w-full !min-w-0"
                   >
                     {busy
                       ? "Deploying…"

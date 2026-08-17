@@ -49,14 +49,15 @@ export function SourceBrowser({
               <button
                 key={file.file_name}
                 type="button"
+                title={file.file_name}
                 onClick={() => setActiveFile(file.file_name)}
-                className={`shrink-0 rounded-md px-3 py-1.5 text-left font-mono text-xs transition lg:w-full lg:py-2 ${
+                className={`shrink-0 rounded-md px-3 py-1.5 text-left font-mono text-xs transition lg:w-full lg:min-w-0 lg:max-w-full lg:overflow-hidden lg:py-2 ${
                   selected
                     ? "bg-accent/10 text-accent-bright shadow-[inset_0_0_0_1px_rgba(18,206,65,0.18)]"
                     : "text-muted hover:bg-white/4 hover:text-ink"
                 }`}
               >
-                <span className="truncate">{file.file_name}</span>
+                <span className="block truncate">{file.file_name}</span>
               </button>
             );
           })}
