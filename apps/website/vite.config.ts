@@ -5,6 +5,13 @@ import { comptime } from "comptime.ts/vite";
 import { defineConfig, type Plugin } from "vite";
 import { loadBlogPostInputs } from "./scripts/blog-posts.ts";
 import { dashboardPrerenderPaths } from "./src/dashboardSections.ts";
+import { validateVercelDeploymentConfig } from "./scripts/deployment-config.ts";
+
+validateVercelDeploymentConfig({
+  target: process.env.VERCEL_TARGET_ENV,
+  apiUrl: process.env.VITE_LIBRETTO_CLOUD_API_URL,
+  githubAppInstallUrl: process.env.VITE_GITHUB_APP_INSTALL_URL,
+});
 
 const comptimePlugin = await comptime();
 const blogPosts = await loadBlogPostInputs();

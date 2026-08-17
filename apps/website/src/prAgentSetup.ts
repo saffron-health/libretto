@@ -1,4 +1,5 @@
 export const GITHUB_APP_INSTALL_URL =
+  import.meta.env.VITE_GITHUB_APP_INSTALL_URL?.trim() ||
   "https://github.com/apps/libretto-agent/installations/new";
 
 export const DEBUGGER_DOCS_URL = "/docs/reference/runtime/playwright-debugger";
