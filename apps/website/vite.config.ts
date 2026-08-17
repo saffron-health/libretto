@@ -48,7 +48,7 @@ export default defineConfig({
         ...blogPostPaths,
         ...dashboardPaths,
         "/open-workflows",
-        "/hosted-workflows",
+        "/workflow-catalogue",
       ].map((path) => ({
         path,
         prerender: { enabled: true },

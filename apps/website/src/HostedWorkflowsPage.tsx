@@ -84,7 +84,7 @@ function hostedKey(workflow: Pick<HostedWorkflowSummary, "tenant_slug" | "workfl
 }
 
 function hostedPath(workflow: Pick<HostedWorkflowSummary, "tenant_slug" | "workflow_name">) {
-  return `/hosted-workflows/${encodeURIComponent(workflow.tenant_slug)}/${encodeURIComponent(workflow.workflow_name)}`;
+  return `/workflow-catalogue/${encodeURIComponent(workflow.tenant_slug)}/${encodeURIComponent(workflow.workflow_name)}`;
 }
 
 function matchesQuery(workflow: HostedWorkflowSummary, query: string): boolean {
@@ -832,7 +832,7 @@ export function HostedWorkflowPage({
   return pageShell(
     <>
       <a
-        href="/hosted-workflows"
+        href="/workflow-catalogue"
         className="inline-flex pt-4 font-mono text-xs text-muted no-underline transition hover:text-ink"
       >
         ← Published workflows

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { HostedWorkflowsPage } from "../HostedWorkflowsPage";
 
-export const Route = createFileRoute("/hosted-workflows")({
+export const Route = createFileRoute("/workflow-catalogue")({
   head: () => ({
     meta: [
       { title: "Hosted Workflow APIs | Libretto" },
