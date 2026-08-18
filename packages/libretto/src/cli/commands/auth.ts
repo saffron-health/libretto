@@ -64,6 +64,7 @@ type ApiKeyListItem = {
 type CliLoginCreateResponse = {
   requestId: string;
   secret: string;
+  userCode?: string;
   expiresAt: string;
 };
 
@@ -135,54 +136,93 @@ async function getCurrentSession(
   }
 }
 
-async function runBrowserAuthFlow(options: {
-  mode: "login" | "signup";
-  apiUrl: string;
+export function buildBrowserLoginUrl(options: {
   websiteUrl: string;
-}): Promise<void> {
-  const login = await orpcCall<CliLoginCreateResponse>({
-    apiUrl: options.apiUrl,
-    path: "/v1/auth/cliLoginCreate",
-    unauthenticated: true,
-  });
-
+  requestId: string;
+  secret: string;
+  mode: "login" | "signup";
+}): URL {
   const loginUrl = new URL("/signin", options.websiteUrl);
-  loginUrl.searchParams.set("cliLoginId", login.requestId);
-  loginUrl.searchParams.set("cliLoginSecret", login.secret);
+  loginUrl.searchParams.set("cliLoginId", options.requestId);
+  loginUrl.searchParams.set("cliLoginSecret", options.secret);
   if (options.mode === "signup") {
     loginUrl.searchParams.set("mode", "signup");
   }
+  return loginUrl;
+}
 
-  console.log(
-    options.mode === "signup"
-      ? "Sign up for Libretto Cloud in your browser:"
-      : "Sign in to Libretto Cloud in your browser:",
-  );
-  console.log(`  ${loginUrl.toString()}`);
-  console.log();
-  if (openBrowser(loginUrl.toString())) {
-    console.log("Opened the page in your default browser.");
-    console.log("If it didn't open, copy the link above into your browser.");
-    console.log();
-  } else {
-    console.log("Copy the link above into your browser.");
-    console.log();
+export function formatDeviceAuthPrompt(options: {
+  mode: "login" | "signup";
+  deviceUrl: string;
+  userCode: string;
+}): string {
+  const action =
+    options.mode === "signup" ? "sign up for" : "sign in to";
+  const started = options.mode === "signup" ? "sign-up" : "login";
+  return [
+    `Follow these steps to ${action} Libretto Cloud using device code authorization:`,
+    "",
+    "1. Open this link in your browser and sign in to your account",
+    `   ${options.deviceUrl}`,
+    "",
+    "2. Enter this one-time code (expires in 10 minutes)",
+    `   ${options.userCode}`,
+    "",
+    `Continue only if you started this ${started} in the Libretto CLI. If a website or another person gave you this code, cancel.`,
+  ].join("\n");
+}
+
+const deviceAuthFlag = SimpleCLI.flag({
+  help: "Sign in with a one-time code at libretto.sh/device (headless / SSH).",
+});
+
+async function persistApprovedLogin(
+  apiUrl: string,
+  result: Extract<CliLoginPollResponse, { status: "approved" }>,
+): Promise<void> {
+  const session = await getCurrentSession(apiUrl, result.cookieHeader);
+  if (!session?.user?.id) {
+    throw new Error(
+      "Browser auth succeeded, but the returned session could not be verified.",
+    );
   }
-  console.log(
-    options.mode === "signup"
-      ? "Waiting for browser sign-up"
-      : "Waiting for browser sign-in",
-  );
 
-  const expiresAt = new Date(login.expiresAt).getTime();
+  const next: AuthState = {
+    apiUrl,
+    session: {
+      cookie: result.cookieHeader,
+      userId: result.userId,
+      email: result.email,
+      expiresAt: session.session.expiresAt ?? result.sessionExpiresAt,
+    },
+  };
+  await writeAuthState(next);
+
+  console.log();
+  console.log(`Logged in as ${result.email}.`);
+  if (!result.emailVerified) {
+    console.log(
+      "Heads up: your email isn't verified yet. Click the verification link in your inbox to finish setup.",
+    );
+  }
+}
+
+async function pollCliLogin(options: {
+  mode: "login" | "signup";
+  apiUrl: string;
+  requestId: string;
+  secret: string;
+  expiresAt: string;
+}): Promise<void> {
+  const expiresAt = new Date(options.expiresAt).getTime();
   let verificationHintShown = false;
   while (Date.now() < expiresAt) {
     const result = await orpcCall<CliLoginPollResponse>({
       apiUrl: options.apiUrl,
       path: "/v1/auth/cliLoginPoll",
       input: {
-        requestId: login.requestId,
-        secret: login.secret,
+        requestId: options.requestId,
+        secret: options.secret,
       },
       unauthenticated: true,
     });
@@ -194,31 +234,7 @@ async function runBrowserAuthFlow(options: {
     }
 
     if (result.status === "approved") {
-      const session = await getCurrentSession(options.apiUrl, result.cookieHeader);
-      if (!session?.user?.id) {
-        throw new Error(
-          "Browser auth succeeded, but the returned session could not be verified.",
-        );
-      }
-
-      const next: AuthState = {
-        apiUrl: options.apiUrl,
-        session: {
-          cookie: result.cookieHeader,
-          userId: result.userId,
-          email: result.email,
-          expiresAt: session.session.expiresAt ?? result.sessionExpiresAt,
-        },
-      };
-      await writeAuthState(next);
-
-      console.log();
-      console.log(`Logged in as ${result.email}.`);
-      if (!result.emailVerified) {
-        console.log(
-          "Heads up: your email isn't verified yet. Click the verification link in your inbox to finish setup.",
-        );
-      }
+      await persistApprovedLogin(options.apiUrl, result);
       return;
     }
 
@@ -235,6 +251,98 @@ async function runBrowserAuthFlow(options: {
   throw new Error(
     `Auth request expired. Run \`libretto cloud auth ${options.mode}\` again.`,
   );
+}
+
+export async function runBrowserAuthFlow(options: {
+  mode: "login" | "signup";
+  apiUrl: string;
+  websiteUrl: string;
+}): Promise<void> {
+  const login = await orpcCall<CliLoginCreateResponse>({
+    apiUrl: options.apiUrl,
+    path: "/v1/auth/cliLoginCreate",
+    unauthenticated: true,
+  });
+
+  const loginUrl = buildBrowserLoginUrl({
+    websiteUrl: options.websiteUrl,
+    requestId: login.requestId,
+    secret: login.secret,
+    mode: options.mode,
+  });
+
+  console.log(
+    options.mode === "signup"
+      ? "Sign up for Libretto Cloud in your browser:"
+      : "Sign in to Libretto Cloud in your browser:",
+  );
+  console.log(`  ${loginUrl.toString()}`);
+  console.log();
+  if (openBrowser(loginUrl.toString())) {
+    console.log("Opened the page in your default browser.");
+    console.log("If it didn't open, copy the link above into your browser.");
+    console.log();
+  } else {
+    console.log("Copy the link above into your browser.");
+    console.log(
+      "On a remote or headless machine? Use `libretto cloud auth login --device-auth` instead.",
+    );
+    console.log();
+  }
+  console.log(
+    options.mode === "signup"
+      ? "Waiting for browser sign-up"
+      : "Waiting for browser sign-in",
+  );
+
+  await pollCliLogin({
+    mode: options.mode,
+    apiUrl: options.apiUrl,
+    requestId: login.requestId,
+    secret: login.secret,
+    expiresAt: login.expiresAt,
+  });
+}
+
+export async function runDeviceAuthFlow(options: {
+  mode: "login" | "signup";
+  apiUrl: string;
+  websiteUrl: string;
+}): Promise<void> {
+  const login = await orpcCall<CliLoginCreateResponse>({
+    apiUrl: options.apiUrl,
+    path: "/v1/auth/cliLoginCreate",
+    unauthenticated: true,
+  });
+
+  if (!login.userCode) {
+    throw new Error(
+      "This Libretto Cloud API does not support device code login yet. Update the API or omit --device-auth.",
+    );
+  }
+
+  const deviceUrl = new URL("/device", options.websiteUrl);
+  if (options.mode === "signup") {
+    deviceUrl.searchParams.set("mode", "signup");
+  }
+  console.log();
+  console.log(
+    formatDeviceAuthPrompt({
+      mode: options.mode,
+      deviceUrl: deviceUrl.toString().replace(/\/$/, ""),
+      userCode: login.userCode,
+    }),
+  );
+  console.log();
+  console.log("Waiting for authentication...");
+
+  await pollCliLogin({
+    mode: options.mode,
+    apiUrl: options.apiUrl,
+    requestId: login.requestId,
+    secret: login.secret,
+    expiresAt: login.expiresAt,
+  });
 }
 
 /**
@@ -291,13 +399,25 @@ async function issueApiKey(
 export const signupCommand = SimpleCLI.command({
   description: "Open the hosted-platform sign-up page",
 })
-  .input(SimpleCLI.input({ positionals: [], named: {} }))
-  .handle(async () => {
-    await runBrowserAuthFlow({
-      mode: "signup",
+  .input(
+    SimpleCLI.input({
+      positionals: [],
+      named: {
+        deviceAuth: deviceAuthFlag,
+      },
+    }),
+  )
+  .handle(async ({ input }) => {
+    const options = {
+      mode: "signup" as const,
       apiUrl: resolveHostedApiUrl(),
       websiteUrl: resolveHostedWebsiteUrl(),
-    });
+    };
+    if (input.deviceAuth) {
+      await runDeviceAuthFlow(options);
+      return;
+    }
+    await runBrowserAuthFlow(options);
   });
 
 // ---------------------------------------------------------------------------
@@ -307,13 +427,25 @@ export const signupCommand = SimpleCLI.command({
 export const loginCommand = SimpleCLI.command({
   description: "Open the hosted-platform sign-in page",
 })
-  .input(SimpleCLI.input({ positionals: [], named: {} }))
-  .handle(async () => {
-    await runBrowserAuthFlow({
-      mode: "login",
+  .input(
+    SimpleCLI.input({
+      positionals: [],
+      named: {
+        deviceAuth: deviceAuthFlag,
+      },
+    }),
+  )
+  .handle(async ({ input }) => {
+    const options = {
+      mode: "login" as const,
       apiUrl: resolveHostedApiUrl(),
       websiteUrl: resolveHostedWebsiteUrl(),
-    });
+    };
+    if (input.deviceAuth) {
+      await runDeviceAuthFlow(options);
+      return;
+    }
+    await runBrowserAuthFlow(options);
   });
 
 export const logoutCommand = SimpleCLI.command({
