@@ -66,12 +66,16 @@ All routes require `x-api-key`.
 
 | Method | Route | Purpose |
 | --- | --- | --- |
-| `GET` | `/v1/catalogue?q=<query>&limit=<limit>` | Search the catalogue. |
-| `GET` | `/v1/catalogue/:publisher/:workflow` | Inspect one workflow. |
-| `POST` | `/v1/catalogue/run/:publisher/:workflow` | Queue a run. |
-| `GET` | `/v1/catalogue/bookmarks` | List tenant bookmarks. |
-| `POST` | `/v1/catalogue/bookmarks` | Save or update a bookmark. |
-| `DELETE` | `/v1/catalogue/bookmarks/:id` | Remove a bookmark. |
+| `POST` | `/v1/catalogue/search` | Search the catalogue. |
+| `POST` | `/v1/catalogue/get` | Inspect one workflow. |
+| `POST` | `/v1/catalogue/run` | Queue a run. |
+| `POST` | `/v1/catalogue/bookmarks/list` | List tenant bookmarks. |
+| `POST` | `/v1/catalogue/bookmarks/save` | Save or update a bookmark. |
+| `POST` | `/v1/catalogue/bookmarks/remove` | Remove a bookmark. |
+
+Each route uses the shared RPC request and response envelope described in the
+[API overview](/libretto-cloud-api/overview). Pass `publisher` and `workflow`
+in the `json` input for `get` and `run`.
 
 Poll run results with `POST /v1/jobs/get`. See
 [Jobs and logs](/libretto-cloud-api/jobs-and-logs) for the response fields.
@@ -80,11 +84,13 @@ The bookmark save body uses this shape:
 
 ```json
 {
-  "workflow": "acme/check-eligibility",
-  "alias": "eligibility",
-  "notes": "Default west region",
-  "default_params": {
-    "region": "west"
+  "json": {
+    "workflow": "acme/check-eligibility",
+    "alias": "eligibility",
+    "notes": "Default west region",
+    "default_params": {
+      "region": "west"
+    }
   }
 }
 ```

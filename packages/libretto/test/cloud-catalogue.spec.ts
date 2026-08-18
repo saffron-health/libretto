@@ -36,61 +36,61 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
     });
 
     let body: unknown;
-    if (path.startsWith("/v1/catalogue?q=")) {
+    if (path === "/v1/catalogue/search") {
       body = {
-        workflows: [
-          {
-            tenant_slug: "acme",
-            workflow_name: "patient-lookup",
-            description: "Find a patient",
-          },
-        ],
-      };
-    } else if (path === "/v1/catalogue/acme/patient-lookup") {
-      body = {
-        tenant_slug: "acme",
-        workflow_name: "patient-lookup",
-        input_schema: { type: "object" },
-        credential_requirements: [],
-      };
-    } else if (
-      path === "/v1/catalogue/bookmarks" &&
-      request.method === "POST"
-    ) {
-      body = {
-        bookmark: {
-          id: bookmarkId,
-          workflow: "acme/patient-lookup",
-          alias: "patient",
+        json: {
+          workflows: [
+            {
+              tenant_slug: "acme",
+              workflow_name: "patient-lookup",
+              description: "Find a patient",
+            },
+          ],
         },
       };
-    } else if (
-      path === "/v1/catalogue/bookmarks" &&
-      request.method === "GET"
-    ) {
+    } else if (path === "/v1/catalogue/get") {
       body = {
-        workflows: [
-          {
-            id: bookmarkId,
-            alias: "patient",
-            tenant_slug: "acme",
-            workflow_name: "patient-lookup",
-            default_params: { region: "west" },
-            available: true,
-          },
-          {
-            id: unavailableBookmarkId,
-            alias: "retired",
-            tenant_slug: null,
-            workflow_name: null,
-            available: false,
-          },
-        ],
+        json: {
+          tenant_slug: "acme",
+          workflow_name: "patient-lookup",
+          input_schema: { type: "object" },
+          credential_requirements: [],
+        },
       };
-    } else if (
-      path === "/v1/catalogue/run/acme/patient-lookup"
-    ) {
-      body = { job_id: jobId, status: "queued" };
+    } else if (path === "/v1/catalogue/bookmarks/save") {
+      body = {
+        json: {
+          bookmark: {
+            id: bookmarkId,
+            workflow: "acme/patient-lookup",
+            alias: "patient",
+          },
+        },
+      };
+    } else if (path === "/v1/catalogue/bookmarks/list") {
+      body = {
+        json: {
+          workflows: [
+            {
+              id: bookmarkId,
+              alias: "patient",
+              tenant_slug: "acme",
+              workflow_name: "patient-lookup",
+              default_params: { region: "west" },
+              available: true,
+            },
+            {
+              id: unavailableBookmarkId,
+              alias: "retired",
+              tenant_slug: null,
+              workflow_name: null,
+              available: false,
+            },
+          ],
+        },
+      };
+    } else if (path === "/v1/catalogue/run") {
+      body = { json: { job_id: jobId, status: "queued" } };
     } else if (path === "/v1/jobs/get") {
       statusCalls += 1;
       body = {
@@ -101,8 +101,8 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
           ...(statusCalls === 1 ? {} : { result: { patient_id: "p-1" } }),
         },
       };
-    } else if (path === `/v1/catalogue/bookmarks/${bookmarkId}`) {
-      body = { id: bookmarkId, removed: true };
+    } else if (path === "/v1/catalogue/bookmarks/remove") {
+      body = { json: { id: bookmarkId, removed: true } };
     } else {
       response.writeHead(404, { "Content-Type": "application/json" });
       response.end(JSON.stringify({ error: `Unexpected path ${path}` }));
@@ -187,13 +187,22 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
   expect(
     requests.find(
       (request) =>
-        request.path === "/v1/catalogue/run/acme/patient-lookup",
+        request.path === "/v1/catalogue/run",
     )?.body,
   ).toEqual({
-    params: { region: "west", patient_id: "p-1" },
-    credentials: { portal: "credential-1" },
-    skip_callbacks: true,
+    json: {
+      publisher: "acme",
+      workflow: "patient-lookup",
+      params: { region: "west", patient_id: "p-1" },
+      credentials: { portal: "credential-1" },
+      skip_callbacks: true,
+    },
   });
+  expect(
+    requests
+      .filter((request) => request.path.startsWith("/v1/catalogue"))
+      .every((request) => request.method === "POST" && request.body !== null),
+  ).toBe(true);
 });
 
 test("cloud workflow commands require an API key", async ({ librettoCli }) => {

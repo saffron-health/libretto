@@ -283,7 +283,7 @@ function highlightJson(value: unknown): string {
 }
 
 function buildHostedAgentPrompt(workflow: HostedWorkflowDetail): string {
-  const runUrl = `${cloudApiUrl}/v1/hosted-workflows/run/${encodeURIComponent(workflow.tenant_slug)}/${encodeURIComponent(workflow.workflow_name)}`;
+  const runUrl = `${cloudApiUrl}/v1/catalogue/run`;
   const credLines =
     workflow.credential_requirements.length === 0
       ? ["- (none)"]
@@ -311,7 +311,8 @@ function buildHostedAgentPrompt(workflow: HostedWorkflowDetail): string {
     `Run endpoint: POST ${runUrl}`,
     "",
     "Authenticate with your Libretto API key in the `x-api-key` header.",
-    "Pass a `credentials` map in the run body: each key is a required name below, and each value is either a credential id or a secret name from YOUR tenant:",
+    `Wrap the request fields in \`json\`, including \`publisher: "${workflow.tenant_slug}"\` and \`workflow: "${workflow.workflow_name}"\`.`,
+    "Pass credentials under `json.credentials`: each key is a required name below, and each value is either a credential id or a secret name from YOUR tenant:",
     ...credLines,
     "",
     schemaBlock,
@@ -535,7 +536,7 @@ function CredentialsReference({
           Credentials
         </h2>
         <Text as="p" size="sm" className="mt-2 leading-6 text-muted">
-          Pass these values under <code className="text-ink">credentials</code>{" "}
+          Pass these values under <code className="text-ink">json.credentials</code>{" "}
           in the request body.
         </Text>
       </div>
@@ -824,7 +825,7 @@ export function HostedWorkflowPage({
   }
 
   const prompt = buildHostedAgentPrompt(workflow);
-  const runUrl = `${cloudApiUrl}/v1/hosted-workflows/run/${encodeURIComponent(workflow.tenant_slug)}/${encodeURIComponent(workflow.workflow_name)}`;
+  const runUrl = `${cloudApiUrl}/v1/catalogue/run`;
   const returnTo = hostedPath(workflow);
   const canViewSource = workflow.source_access === "granted";
   const showSource = canViewSource && activeView === "source";
@@ -910,7 +911,7 @@ export function HostedWorkflowPage({
 
               <SchemaReference
                 title="Request fields"
-                description="Pass these fields under params in the JSON request body."
+                description="Pass these fields under json.params in the request body."
                 schema={workflow.input_schema}
                 emptyLabel="This workflow has no declared request fields."
               />
