@@ -14,7 +14,12 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createAiSdkBrowserToolsForPage } from "libretto-browser-tools/ai-sdk";
 import type { Page } from "playwright";
 
-export type SupportedAgentProvider = "anthropic" | "openai";
+export type SupportedAgentProvider = "anthropic" | "openai" | "minimax";
+
+function isMinimaxChinaRegion(): boolean {
+  const region = process.env.MINIMAX_REGION?.trim().toLowerCase();
+  return region === "cn" || region === "cn_zh" || region === "china";
+}
 
 export type GitHubDebuggerConfig = {
   owner: string;
@@ -290,9 +295,13 @@ export function parseAgentModel(model: string): {
   if (!modelId) {
     throw new Error(`Invalid agent model "${model}". Model id cannot be empty.`);
   }
-  if (provider !== "openai" && provider !== "anthropic") {
+  if (
+    provider !== "openai" &&
+    provider !== "anthropic" &&
+    provider !== "minimax"
+  ) {
     throw new Error(
-      `Unsupported agent model provider "${provider}". Supported providers: openai, anthropic.`,
+      `Unsupported agent model provider "${provider}". Supported providers: openai, anthropic, minimax.`,
     );
   }
   return { provider, modelId };
@@ -617,6 +626,31 @@ async function resolveLanguageModel(
       throw new Error("OpenAI API key is missing. Set OPENAI_API_KEY or agent.apiKey.");
     }
     return createOpenAI({ apiKey })(model.modelId);
+  }
+
+  if (model.provider === "minimax") {
+    const minimaxApiKey =
+      apiKeyOverride ?? process.env.MINIMAX_API_KEY?.trim();
+    if (!minimaxApiKey) {
+      throw new Error(
+        "MiniMax API key is missing. Set MINIMAX_API_KEY or agent.apiKey.",
+      );
+    }
+    const host = isMinimaxChinaRegion()
+      ? "https://api.minimaxi.com"
+      : "https://api.minimax.io";
+    const useAnthropicStyle =
+      process.env.MINIMAX_API_STYLE?.trim().toLowerCase() === "anthropic";
+    if (useAnthropicStyle) {
+      return createAnthropic({
+        apiKey: minimaxApiKey,
+        baseURL: `${host}/anthropic`,
+      })(model.modelId);
+    }
+    return createOpenAI({
+      apiKey: minimaxApiKey,
+      baseURL: `${host}/v1`,
+    })(model.modelId);
   }
 
   const apiKey = apiKeyOverride ?? process.env.ANTHROPIC_API_KEY?.trim();
