@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorkflowCatalogueRouteImport } from './routes/workflow-catalogue'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as SigninRouteImport } from './routes/signin'
+import { Route as DeviceRouteImport } from './routes/device'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as OpenWorkflowsRouteImport } from './routes/open-workflows'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
@@ -54,6 +55,11 @@ const VerifyEmailRoute = VerifyEmailRouteImport.update({
 const SigninRoute = SigninRouteImport.update({
   id: '/signin',
   path: '/signin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeviceRoute = DeviceRouteImport.update({
+  id: '/device',
+  path: '/device',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -215,6 +221,7 @@ export interface FileRoutesByFullPath {
   '/open-workflows': typeof OpenWorkflowsRoute
   '/privacy': typeof PrivacyRoute
   '/signin': typeof SigninRoute
+  '/device': typeof DeviceRoute
   '/verify-email': typeof VerifyEmailRoute
   '/workflow-catalogue': typeof WorkflowCatalogueRoute
   '/blog/$slug': typeof BlogSlugRoute
@@ -247,6 +254,7 @@ export interface FileRoutesByTo {
   '/open-workflows': typeof OpenWorkflowsRoute
   '/privacy': typeof PrivacyRoute
   '/signin': typeof SigninRoute
+  '/device': typeof DeviceRoute
   '/verify-email': typeof VerifyEmailRoute
   '/workflow-catalogue': typeof WorkflowCatalogueRoute
   '/blog/$slug': typeof BlogSlugRoute
@@ -281,6 +289,7 @@ export interface FileRoutesById {
   '/open-workflows': typeof OpenWorkflowsRoute
   '/privacy': typeof PrivacyRoute
   '/signin': typeof SigninRoute
+  '/device': typeof DeviceRoute
   '/verify-email': typeof VerifyEmailRoute
   '/workflow-catalogue': typeof WorkflowCatalogueRoute
   '/blog/$slug': typeof BlogSlugRoute
@@ -316,6 +325,7 @@ export interface FileRouteTypes {
     | '/open-workflows'
     | '/privacy'
     | '/signin'
+    | '/device'
     | '/verify-email'
     | '/workflow-catalogue'
     | '/blog/$slug'
@@ -348,6 +358,7 @@ export interface FileRouteTypes {
     | '/open-workflows'
     | '/privacy'
     | '/signin'
+    | '/device'
     | '/verify-email'
     | '/workflow-catalogue'
     | '/blog/$slug'
@@ -381,6 +392,7 @@ export interface FileRouteTypes {
     | '/open-workflows'
     | '/privacy'
     | '/signin'
+    | '/device'
     | '/verify-email'
     | '/workflow-catalogue'
     | '/blog/$slug'
@@ -415,6 +427,7 @@ export interface RootRouteChildren {
   OpenWorkflowsRoute: typeof OpenWorkflowsRoute
   PrivacyRoute: typeof PrivacyRoute
   SigninRoute: typeof SigninRoute
+  DeviceRoute: typeof DeviceRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
   WorkflowCatalogueRoute: typeof WorkflowCatalogueRoute
   DashboardSectionRoute: typeof DashboardSectionRoute
@@ -453,6 +466,13 @@ declare module '@tanstack/react-router' {
       path: '/signin'
       fullPath: '/signin'
       preLoaderRoute: typeof SigninRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/device': {
+      id: '/device'
+      path: '/device'
+      fullPath: '/device'
+      preLoaderRoute: typeof DeviceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -683,6 +703,7 @@ const rootRouteChildren: RootRouteChildren = {
   OpenWorkflowsRoute: OpenWorkflowsRoute,
   PrivacyRoute: PrivacyRoute,
   SigninRoute: SigninRoute,
+  DeviceRoute: DeviceRoute,
   VerifyEmailRoute: VerifyEmailRoute,
   WorkflowCatalogueRoute: WorkflowCatalogueRoute,
   DashboardSectionRoute: DashboardSectionRoute,

@@ -111,6 +111,19 @@ describe("redirectAfterVerifiedEmail", () => {
     ).resolves.toBe("/dashboard/cloud-browsers");
   });
 
+  it("sends device-code CLI approval home even before a tenant exists", async () => {
+    await expect(
+      redirectAfterVerifiedEmail({
+        hasTenant: false,
+        returnTo: "/device?user_code=WDJB-MJHT",
+        hasCliLoginParams: false,
+        approveCliLogin: async () => {
+          throw new Error("should not be called");
+        },
+      }),
+    ).resolves.toBe("/device?user_code=WDJB-MJHT");
+  });
+
   it("drops dashboard return targets before a tenant exists", async () => {
     await expect(
       redirectAfterVerifiedEmail({

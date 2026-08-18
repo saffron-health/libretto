@@ -48,6 +48,9 @@ export function postAuthRedirect(input: {
 }): string {
   const returnTo = sanitizeReturnToForAuthState(input.returnTo, input.hasTenant);
   if (!input.emailVerified) return withReturnTo("/verify-email", returnTo);
+  if (returnTo && new URL(returnTo, window.location.origin).pathname === "/device") {
+    return returnTo;
+  }
   if (!input.hasTenant) return withReturnTo("/onboarding", returnTo);
   return returnTo ?? "/dashboard";
 }
