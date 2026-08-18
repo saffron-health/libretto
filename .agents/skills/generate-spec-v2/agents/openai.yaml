@@ -1,0 +1,4 @@
+interface:
+  display_name: "Generate Spec V2"
+  short_description: "Write phased specs with flows and diffs"
+  default_prompt: "Use $generate-spec-v2 to plan this feature as a phased implementation spec."
