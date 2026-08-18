@@ -17,7 +17,14 @@ type CliLoginApproveResponse = {
   email: string;
 };
 
+function currentOrigin(): string {
+  return typeof window === "undefined"
+    ? "https://libretto.sh"
+    : window.location.origin;
+}
+
 function currentSearchParams(): URLSearchParams {
+  if (typeof window === "undefined") return new URLSearchParams();
   return new URLSearchParams(window.location.search);
 }
 
@@ -26,7 +33,7 @@ function prefilledUserCode(): string {
 }
 
 function deviceReturnTo(userCode: string): string {
-  const url = new URL("/device", window.location.origin);
+  const url = new URL("/device", currentOrigin());
   if (userCode) url.searchParams.set("user_code", userCode);
   const mode = currentSearchParams().get("mode")?.trim();
   if (mode === "signup") url.searchParams.set("mode", "signup");
@@ -35,7 +42,7 @@ function deviceReturnTo(userCode: string): string {
 
 function signInHref(userCode: string): string {
   const returnTo = deviceReturnTo(userCode);
-  const url = new URL("/signin", window.location.origin);
+  const url = new URL("/signin", currentOrigin());
   url.searchParams.set("returnTo", returnTo);
   if (currentSearchParams().get("mode")?.trim() === "signup") {
     url.searchParams.set("mode", "signup");

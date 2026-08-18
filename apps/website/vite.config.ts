@@ -6,7 +6,24 @@ import { defineConfig, type Plugin } from "vite";
 import { loadBlogPostInputs } from "./scripts/blog-posts.ts";
 import { dashboardPrerenderPaths } from "./src/dashboardSections.ts";
 
-const comptimePlugin = await comptime();
+function withoutViteQuery(id: string): string {
+  const query = id.indexOf("?");
+  return query === -1 ? id : id.slice(0, query);
+}
+
+async function comptimePlugin(): Promise<Plugin> {
+  const plugin = await comptime();
+  const load = plugin.load;
+  plugin.enforce = "pre";
+  if (typeof load === "function") {
+    plugin.load = async function loadWithoutViteQuery(id, options) {
+      return load.call(this, withoutViteQuery(id), options);
+    };
+  }
+  return plugin;
+}
+
+const comptimeVitePlugin = await comptimePlugin();
 const blogPosts = await loadBlogPostInputs();
 const blogPostPaths = blogPosts.map((post) => `/blog/${post.slug}`);
 const dashboardPaths = dashboardPrerenderPaths;
@@ -37,7 +54,7 @@ function localDocsRedirectPlugin(): Plugin {
 export default defineConfig({
   plugins: [
     localDocsRedirectPlugin(),
-    comptimePlugin,
+    comptimeVitePlugin,
     tailwindcss(),
     tanstackStart({
       prerender: {
