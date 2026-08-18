@@ -28,11 +28,13 @@ curl -X POST "https://api.libretto.sh/v1/jobs/get" \
 
 ```json
 {
-  "job_id": "<job-id>",
-  "workflow": "scrape-page",
-  "status": "completed",
-  "result": {
-    "title": "Example Domain"
+  "json": {
+    "job_id": "<job-id>",
+    "workflow": "scrape-page",
+    "status": "completed",
+    "result": {
+      "title": "Example Domain"
+    }
   }
 }
 ```

@@ -36,6 +36,50 @@ curl -X POST "https://api.libretto.sh/v1/jobs/get" \
   }'
 ```
 
+### Response format
+
+The RPC handler wraps successful responses in a top-level `json` field. The
+response fields listed on each endpoint page are inside that field. For
+example, a successful response has this shape:
+
+```json
+{
+  "json": {
+    "job_id": "<job-id>",
+    "status": "completed"
+  }
+}
+```
+
+Errors returned by the RPC handler use the same envelope. Validation details,
+when present, are in `json.data`:
+
+```json
+{
+  "json": {
+    "defined": false,
+    "code": "BAD_REQUEST",
+    "status": 400,
+    "message": "Input validation failed",
+    "data": {
+      "issues": [
+        {
+          "validation": "uuid",
+          "code": "invalid_string",
+          "message": "Invalid uuid",
+          "path": ["id"]
+        }
+      ]
+    }
+  }
+}
+```
+
+Middleware or infrastructure can return a direct JSON error before a request
+reaches the RPC handler. Always check the HTTP status before reading the body.
+
+Catalogue routes return direct JSON responses without this RPC envelope.
+
 ### Authentication rules
 
 - `POST /v1/auth/*` routes are public and do not require `x-api-key`.
