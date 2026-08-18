@@ -905,6 +905,31 @@ export function HostedWorkflowPage({
                 />
               </section>
 
+              <section>
+                <div className="border-b border-rule pb-4">
+                  <h2 className="text-2xl font-medium tracking-tight text-ink">
+                    Request envelope
+                  </h2>
+                  <Text as="p" size="sm" className="mt-2 leading-6 text-muted">
+                    Wrap all request fields in the top-level json object.
+                  </Text>
+                </div>
+                <ParamRow
+                  name="json.publisher"
+                  typeLabel="string"
+                  required
+                  description={`Use ${workflow.tenant_slug}.`}
+                  extras={[]}
+                />
+                <ParamRow
+                  name="json.workflow"
+                  typeLabel="string"
+                  required
+                  description={`Use ${workflow.workflow_name}.`}
+                  extras={[]}
+                />
+              </section>
+
               <CredentialsReference
                 requirements={workflow.credential_requirements}
               />

@@ -80,6 +80,37 @@ in the `json` input for `get` and `run`.
 Poll run results with `POST /v1/jobs/get`. See
 [Jobs and logs](/libretto-cloud-api/jobs-and-logs) for the response fields.
 
+### Queue a run
+
+The run route is shared by every catalogue workflow. Identify the publication
+with `publisher` and `workflow` inside the RPC input:
+
+```bash
+curl -sS -X POST https://api.libretto.sh/v1/catalogue/run \
+  -H "x-api-key: $LIBRETTO_API_KEY" \
+  -H "content-type: application/json" \
+  -d '{
+    "json": {
+      "publisher": "acme",
+      "workflow": "check-eligibility",
+      "params": { "member_id": "member-123" },
+      "skip_callbacks": true
+    }
+  }'
+```
+
+```json
+{
+  "json": {
+    "success": true,
+    "job_id": "f7dcbb42-282b-49d7-b9eb-7c349a0c9e35",
+    "status": "queued",
+    "catalogue_workflow": "acme/check-eligibility",
+    "message": "Job queued — waiting for browser capacity"
+  }
+}
+```
+
 The bookmark save body uses this shape:
 
 ```json
