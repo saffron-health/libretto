@@ -311,7 +311,7 @@ function buildHostedAgentPrompt(workflow: HostedWorkflowDetail): string {
     `Run endpoint: POST ${runUrl}`,
     "",
     "Authenticate with your Libretto API key in the `x-api-key` header.",
-    "Wrap the run input in a top-level `json` field. Pass credentials under `json.credentials`: each key is a required name below, and each value is either a credential id or a secret name from YOUR tenant:",
+    "Wrap the run input in a top-level `json` field. Put workflow input fields under `json.params`. Pass credentials under `json.credentials`: each key is a required name below, and each value is either a credential id or a secret name from YOUR tenant:",
     ...credLines,
     "",
     schemaBlock,
