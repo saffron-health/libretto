@@ -36,7 +36,7 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
     });
 
     let body: unknown;
-    if (path === "/v1/catalogue/search") {
+    if (path.startsWith("/v1/catalogue?q=")) {
       body = {
         json: {
           workflows: [
@@ -48,7 +48,7 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
           ],
         },
       };
-    } else if (path === "/v1/catalogue/get") {
+    } else if (path === "/v1/catalogue/acme/patient-lookup") {
       body = {
         json: {
           tenant_slug: "acme",
@@ -57,7 +57,10 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
           credential_requirements: [],
         },
       };
-    } else if (path === "/v1/catalogue/bookmarks/save") {
+    } else if (
+      path === "/v1/catalogue/bookmarks" &&
+      request.method === "POST"
+    ) {
       body = {
         json: {
           bookmark: {
@@ -67,7 +70,10 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
           },
         },
       };
-    } else if (path === "/v1/catalogue/bookmarks/list") {
+    } else if (
+      path === "/v1/catalogue/bookmarks" &&
+      request.method === "GET"
+    ) {
       body = {
         json: {
           workflows: [
@@ -89,7 +95,9 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
           ],
         },
       };
-    } else if (path === "/v1/catalogue/run") {
+    } else if (
+      path === "/v1/catalogue/run/acme/patient-lookup"
+    ) {
       body = { json: { job_id: jobId, status: "queued" } };
     } else if (path === "/v1/jobs/get") {
       statusCalls += 1;
@@ -101,7 +109,7 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
           ...(statusCalls === 1 ? {} : { result: { patient_id: "p-1" } }),
         },
       };
-    } else if (path === "/v1/catalogue/bookmarks/remove") {
+    } else if (path === `/v1/catalogue/bookmarks/${bookmarkId}`) {
       body = { json: { id: bookmarkId, removed: true } };
     } else {
       response.writeHead(404, { "Content-Type": "application/json" });
@@ -187,22 +195,15 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
   expect(
     requests.find(
       (request) =>
-        request.path === "/v1/catalogue/run",
+        request.path === "/v1/catalogue/run/acme/patient-lookup",
     )?.body,
   ).toEqual({
     json: {
-      publisher: "acme",
-      workflow: "patient-lookup",
       params: { region: "west", patient_id: "p-1" },
       credentials: { portal: "credential-1" },
       skip_callbacks: true,
     },
   });
-  expect(
-    requests
-      .filter((request) => request.path.startsWith("/v1/catalogue"))
-      .every((request) => request.method === "POST" && request.body !== null),
-  ).toBe(true);
 });
 
 test("cloud workflow commands require an API key", async ({ librettoCli }) => {

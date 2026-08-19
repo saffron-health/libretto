@@ -1,6 +1,9 @@
 import { SimpleCLI } from "affordance";
 import { z } from "zod";
-import { orpcCall } from "../core/auth-fetch.js";
+import {
+  ApiCallError,
+  authFetch,
+} from "../core/auth-fetch.js";
 import { createCloudJobStatusCommand } from "./cloud-job-status.js";
 import { jsonObjectInput } from "./cloud-json-input.js";
 import { withCloudApiKey, type CloudApiKeyContext } from "./shared.js";
@@ -20,17 +23,56 @@ type RunJobResponse = {
   status: string;
 };
 
-async function catalogueCall<TResult>(opts: {
+async function cloudRestCall<TResult>(opts: {
   ctx: CloudApiKeyContext;
+  method?: "GET" | "POST" | "DELETE";
   path: string;
-  input?: Record<string, unknown>;
+  body?: unknown;
 }): Promise<TResult> {
-  return orpcCall<TResult>({
+  const response = await authFetch({
     apiUrl: opts.ctx.apiUrl,
     credential: opts.ctx.credential,
+    method: opts.method ?? "GET",
     path: opts.path,
-    input: opts.input,
+    body: opts.body === undefined ? undefined : { json: opts.body },
   });
+  const text = await response.text();
+  let data: unknown;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error(
+      `Unexpected response from ${opts.path} (${response.status}). Try the command again.`,
+    );
+  }
+  const envelope =
+    data && typeof data === "object" ? (data as { json?: unknown }) : null;
+  const result = envelope?.json;
+  if (!response.ok) {
+    const body = (result ?? data) as {
+      error?: unknown;
+      message?: unknown;
+      code?: unknown;
+    };
+    throw new ApiCallError({
+      message:
+        typeof body.error === "string"
+          ? body.error
+          : typeof body.message === "string"
+            ? body.message
+            : `${opts.path} failed (${response.status})`,
+      status: response.status,
+      code: typeof body.code === "string" ? body.code : null,
+      data,
+      path: opts.path,
+    });
+  }
+  if (!envelope || !("json" in envelope)) {
+    throw new Error(
+      `Unexpected response from ${opts.path} (${response.status}). Try the command again.`,
+    );
+  }
+  return result as TResult;
 }
 
 function printJsonOrLines(
@@ -48,9 +90,9 @@ function printJsonOrLines(
 async function savedWorkflows(
   ctx: CloudApiKeyContext,
 ): Promise<WorkflowSummary[]> {
-  const response = await catalogueCall<{ workflows: WorkflowSummary[] }>({
+  const response = await cloudRestCall<{ workflows: WorkflowSummary[] }>({
     ctx,
-    path: "/v1/catalogue/bookmarks/list",
+    path: "/v1/catalogue/bookmarks",
   });
   return response.workflows;
 }
@@ -119,10 +161,12 @@ export const searchCatalogueCommand = SimpleCLI.command({
   )
   .use(withCloudApiKey("search the workflow catalogue"))
   .handle(async ({ input, ctx }) => {
-    const response = await catalogueCall<{ workflows: WorkflowSummary[] }>({
+    const query = new URLSearchParams();
+    if (input.query) query.set("q", input.query);
+    query.set("limit", String(input.limit ?? 20));
+    const response = await cloudRestCall<{ workflows: WorkflowSummary[] }>({
       ctx,
-      path: "/v1/catalogue/search",
-      input: { q: input.query, limit: input.limit ?? 20 },
+      path: `/v1/catalogue?${query}`,
     });
     printJsonOrLines(
       response,
@@ -152,13 +196,9 @@ export const getCatalogueWorkflowCommand = SimpleCLI.command({
   .use(withCloudApiKey("inspect catalogue workflows"))
   .handle(async ({ input, ctx }) => {
     const workflow = await resolveWorkflow(ctx, input.workflow!);
-    const response = await catalogueCall<Record<string, unknown>>({
+    const response = await cloudRestCall<Record<string, unknown>>({
       ctx,
-      path: "/v1/catalogue/get",
-      input: {
-        publisher: workflow.tenantSlug,
-        workflow: workflow.workflowName,
-      },
+      path: `/v1/catalogue/${encodeURIComponent(workflow.tenantSlug)}/${encodeURIComponent(workflow.workflowName)}`,
     });
     const output = { workflow: response, default_params: workflow.defaultParams };
     printJsonOrLines(output, input.json, [
@@ -218,12 +258,11 @@ export const runCatalogueWorkflowCommand = SimpleCLI.command({
       "--credentials-file",
       input.credentialsFile,
     );
-    const response = await catalogueCall<RunJobResponse>({
+    const response = await cloudRestCall<RunJobResponse>({
       ctx,
-      path: "/v1/catalogue/run",
-      input: {
-        publisher: workflow.tenantSlug,
-        workflow: workflow.workflowName,
+      method: "POST",
+      path: `/v1/catalogue/run/${encodeURIComponent(workflow.tenantSlug)}/${encodeURIComponent(workflow.workflowName)}`,
+      body: {
         params: { ...workflow.defaultParams, ...params },
         ...(Object.keys(credentials).length > 0 ? { credentials } : {}),
         ...(input.timeoutSeconds !== undefined
@@ -278,12 +317,13 @@ export const saveCatalogueWorkflowCommand = SimpleCLI.command({
       "--defaults-file",
       input.defaultsFile,
     );
-    const response = await catalogueCall<{
+    const response = await cloudRestCall<{
       bookmark: { id: string; workflow: string; alias: string | null };
     }>({
       ctx,
-      path: "/v1/catalogue/bookmarks/save",
-      input: {
+      method: "POST",
+      path: "/v1/catalogue/bookmarks",
+      body: {
         workflow: input.workflow,
         alias: input.alias,
         notes: input.notes,
@@ -345,10 +385,10 @@ export const removeSavedCatalogueWorkflowCommand = SimpleCLI.command({
   )
   .use(withCloudApiKey("remove saved catalogue workflows"))
   .handle(async ({ input, ctx }) => {
-    const response = await catalogueCall<{ removed: boolean; id: string }>({
+    const response = await cloudRestCall<{ removed: boolean; id: string }>({
       ctx,
-      path: "/v1/catalogue/bookmarks/remove",
-      input: { id: input.id },
+      method: "DELETE",
+      path: `/v1/catalogue/bookmarks/${input.id}`,
     });
     printJsonOrLines(response, input.json, [
       response.removed

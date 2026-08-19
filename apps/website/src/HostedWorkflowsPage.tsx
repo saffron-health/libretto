@@ -283,7 +283,7 @@ function highlightJson(value: unknown): string {
 }
 
 function buildHostedAgentPrompt(workflow: HostedWorkflowDetail): string {
-  const runUrl = `${cloudApiUrl}/v1/catalogue/run`;
+  const runUrl = `${cloudApiUrl}/v1/catalogue/run/${encodeURIComponent(workflow.tenant_slug)}/${encodeURIComponent(workflow.workflow_name)}`;
   const credLines =
     workflow.credential_requirements.length === 0
       ? ["- (none)"]
@@ -311,13 +311,12 @@ function buildHostedAgentPrompt(workflow: HostedWorkflowDetail): string {
     `Run endpoint: POST ${runUrl}`,
     "",
     "Authenticate with your Libretto API key in the `x-api-key` header.",
-    `Wrap the request fields in \`json\`, including \`publisher: "${workflow.tenant_slug}"\` and \`workflow: "${workflow.workflow_name}"\`.`,
-    "Pass credentials under `json.credentials`: each key is a required name below, and each value is either a credential id or a secret name from YOUR tenant:",
+    "Wrap the run input in a top-level `json` field. Pass credentials under `json.credentials`: each key is a required name below, and each value is either a credential id or a secret name from YOUR tenant:",
     ...credLines,
     "",
     schemaBlock,
     "",
-    "Or poll instead of a callback by setting `\"skip_callbacks\": true` and calling `POST /v1/jobs/get` with the returned `job_id`.",
+    "Or poll instead of a callback by setting `json.skip_callbacks` to `true` and calling `POST /v1/jobs/get` with the returned `job_id`.",
     "Jobs and credentials stay in your tenant. The publisher cannot see your identity, inputs, credentials, outputs, errors, or job details.",
   ]
     .filter((line): line is string => line !== null)
@@ -825,7 +824,7 @@ export function HostedWorkflowPage({
   }
 
   const prompt = buildHostedAgentPrompt(workflow);
-  const runUrl = `${cloudApiUrl}/v1/catalogue/run`;
+  const runUrl = `${cloudApiUrl}/v1/catalogue/run/${encodeURIComponent(workflow.tenant_slug)}/${encodeURIComponent(workflow.workflow_name)}`;
   const returnTo = hostedPath(workflow);
   const canViewSource = workflow.source_access === "granted";
   const showSource = canViewSource && activeView === "source";
@@ -910,22 +909,12 @@ export function HostedWorkflowPage({
                   <h2 className="text-2xl font-medium tracking-tight text-ink">
                     Request envelope
                   </h2>
-                  <Text as="p" size="sm" className="mt-2 leading-6 text-muted">
-                    Wrap all request fields in the top-level json object.
-                  </Text>
                 </div>
                 <ParamRow
-                  name="json.publisher"
-                  typeLabel="string"
+                  name="json"
+                  typeLabel="object"
                   required
-                  description={`Use ${workflow.tenant_slug}.`}
-                  extras={[]}
-                />
-                <ParamRow
-                  name="json.workflow"
-                  typeLabel="string"
-                  required
-                  description={`Use ${workflow.workflow_name}.`}
+                  description="Wrap params, credentials, and run options in this top-level field."
                   extras={[]}
                 />
               </section>
