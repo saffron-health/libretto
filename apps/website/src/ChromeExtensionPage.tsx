@@ -127,68 +127,80 @@ function BrowserDemo() {
   );
 }
 
+function ExtensionPanelHeader({ status }: { status: string }) {
+  return (
+    <div className="flex items-center justify-between border-b border-rule bg-panel-hi/45 px-5 py-3.5">
+      <div>
+        <div className="text-sm font-medium text-ink">Libretto</div>
+        <div className="mt-0.5 font-mono text-[9px] text-accent-bright">
+          {status}
+        </div>
+      </div>
+      <span className="rounded border border-accent/20 bg-green-3/20 px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.1em] text-accent-bright">
+        Chrome
+      </span>
+    </div>
+  );
+}
+
 function OneOffTaskGraphic() {
   return (
     <Panel padding="none" radius="lg" className="overflow-hidden">
-      <div className="flex items-center justify-between border-b border-rule bg-panel-hi/45 px-5 py-3.5">
-        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
-          One-off task
-        </span>
-        <span className="flex items-center gap-2 font-mono text-[10px] text-accent-bright">
-          <span className="size-1.5 rounded-full bg-accent" /> Complete
-        </span>
-      </div>
-      <div className="grid gap-0 md:grid-cols-[0.92fr_1.08fr]">
-        <div className="border-b border-rule p-5 md:border-r md:border-b-0">
-          <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
-            Request
+      <ExtensionPanelHeader status="Task complete" />
+      <div className="space-y-4 bg-[#121512] p-5">
+        <div className="ml-10 rounded-lg rounded-tr-sm border border-rule bg-panel-hi p-4 text-xs leading-5 text-ink">
+          Find ten dentists nearby that are open Saturdays and add their
+          details to a Google Sheet.
+        </div>
+        <div className="mr-3 rounded-lg rounded-tl-sm border border-accent/20 bg-green-3/20 p-4">
+          <div className="flex items-center gap-2 text-xs text-accent-bright">
+            <span className="grid size-4 place-items-center rounded-full bg-accent text-[10px] text-bg">
+              ✓
+            </span>
+            Done — I created the sheet
           </div>
-          <p className="mt-3 text-sm leading-6 text-ink">
-            Find ten dentists nearby that are open Saturdays and add their
-            details to a Google Sheet.
-          </p>
-          <div className="mt-6 space-y-3 border-t border-rule pt-5 font-mono text-[11px] text-muted">
+          <div className="mt-4 grid gap-4 sm:grid-cols-[0.84fr_1.16fr]">
+            <div className="space-y-2.5 font-mono text-[10px] text-muted">
             {[
               "Searched Google Maps",
               "Checked hours and ratings",
               "Created the spreadsheet",
             ].map((step) => (
-              <div key={step} className="flex items-center gap-3">
+              <div key={step} className="flex items-center gap-2">
                 <span className="text-accent">✓</span>
                 <span>{step}</span>
               </div>
             ))}
-          </div>
-        </div>
-        <div className="bg-bg/35 p-5">
-          <div className="flex items-end justify-between border-b border-rule pb-3">
-            <div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
-                Result
-              </div>
-              <div className="mt-1 text-sm text-ink">Saturday dentists</div>
             </div>
-            <div className="font-mono text-[10px] text-muted">10 rows</div>
-          </div>
-          <div className="font-mono text-[10px] text-muted">
-            {[
-              ["Lake Dental", "4.9", "9–2"],
-              ["Grand Avenue", "4.8", "8–1"],
-              ["Temescal Smiles", "4.7", "9–3"],
-            ].map(([name, rating, hours]) => (
-              <div
-                key={name}
-                className="grid grid-cols-[1fr_38px_42px] gap-3 border-b border-rule/70 py-3 last:border-0"
-              >
-                <span className="text-ink/80">{name}</span>
-                <span>{rating}</span>
-                <span>{hours}</span>
+            <div className="overflow-hidden rounded-md border border-rule bg-bg/55">
+              <div className="flex items-end justify-between border-b border-rule px-3 py-2.5">
+                <div>
+                  <div className="font-mono text-[8px] uppercase tracking-[0.12em] text-faint">
+                    Google Sheets
+                  </div>
+                  <div className="mt-1 text-[11px] text-ink">
+                    Saturday dentists
+                  </div>
+                </div>
+                <div className="font-mono text-[9px] text-muted">10 rows</div>
               </div>
-            ))}
-          </div>
-          <div className="mt-3 flex items-center justify-between rounded border border-accent/20 bg-green-3/20 px-3 py-2.5 font-mono text-[10px] text-accent-bright">
-            <span>Google Sheet ready</span>
-            <ArrowIcon />
+              <div className="px-3 font-mono text-[9px] text-muted">
+                {[
+                  ["Lake Dental", "4.9", "9–2"],
+                  ["Grand Avenue", "4.8", "8–1"],
+                  ["Temescal Smiles", "4.7", "9–3"],
+                ].map(([name, rating, hours]) => (
+                  <div
+                    key={name}
+                    className="grid grid-cols-[1fr_28px_30px] gap-2 border-b border-rule/70 py-2 last:border-0"
+                  >
+                    <span className="text-ink/80">{name}</span>
+                    <span>{rating}</span>
+                    <span>{hours}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -199,74 +211,70 @@ function OneOffTaskGraphic() {
 function WorkflowGraphic() {
   return (
     <Panel padding="none" radius="lg" className="overflow-hidden">
-      <div className="flex items-center justify-between border-b border-rule bg-panel-hi/45 px-5 py-3.5">
-        <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
-            Saved workflow
-          </div>
-          <div className="mt-1 text-sm text-ink">Weekly sales tracker</div>
+      <ExtensionPanelHeader status="Workflow ready" />
+      <div className="space-y-4 bg-[#121512] p-5">
+        <div className="ml-10 rounded-lg rounded-tr-sm border border-rule bg-panel-hi p-4 text-xs leading-5 text-ink">
+          Save this task and run it every Monday at 8 AM.
         </div>
-        <span className="rounded border border-accent/20 bg-green-3/20 px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.1em] text-accent-bright">
-          Active
-        </span>
-      </div>
-      <div className="p-5">
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-          <div className="rounded-md border border-rule bg-bg/45 p-4">
-            <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
-              Source
-            </div>
-            <div className="mt-2 text-sm text-ink">Shopify orders</div>
-          </div>
-          <ArrowIcon />
-          <div className="rounded-md border border-rule bg-bg/45 p-4">
-            <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
-              Destination
-            </div>
-            <div className="mt-2 text-sm text-ink">Google Sheets</div>
-          </div>
-        </div>
-        <div className="mt-4 flex items-center justify-between rounded-md border border-rule bg-bg/45 px-4 py-3">
-          <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
-              Schedule
-            </div>
-            <div className="mt-1 text-sm text-ink">Every Monday at 8:00 AM</div>
-          </div>
-          <div className="grid grid-cols-7 gap-1" aria-label="Runs every Monday">
-            {["M", "T", "W", "T", "F", "S", "S"].map((day, index) => (
-              <span
-                key={`${day}-${index}`}
-                className={`grid size-6 place-items-center rounded-sm font-mono text-[9px] ${
-                  index === 0
-                    ? "bg-accent text-bg"
-                    : "border border-rule text-faint"
-                }`}
-              >
-                {day}
+        <div className="mr-3 rounded-lg rounded-tl-sm border border-accent/20 bg-green-3/20 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs text-accent-bright">
+              <span className="grid size-4 place-items-center rounded-full bg-accent text-[10px] text-bg">
+                ✓
               </span>
-            ))}
-          </div>
-        </div>
-      </div>
-      <div className="border-t border-rule bg-bg/35 px-5 py-4">
-        <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
-          Recent runs
-        </div>
-        <div className="space-y-2 font-mono text-[10px]">
-          {[
-            ["Aug 17", "128 orders", "Completed"],
-            ["Aug 10", "116 orders", "Completed"],
-          ].map(([date, result, status]) => (
-            <div
-              key={date}
-              className="grid grid-cols-[62px_1fr_auto] items-center gap-3 border-t border-rule/70 pt-2 text-muted"
-            >
-              <span>{date}</span>
-              <span className="text-ink/75">{result}</span>
-              <span className="text-accent-bright">✓ {status}</span>
+              Weekly sales tracker saved
             </div>
-          ))}
+            <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-accent-bright">
+              Active
+            </span>
+          </div>
+          <div className="mt-4 rounded-md border border-rule bg-bg/55 p-3">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+              <div>
+                <div className="font-mono text-[8px] uppercase tracking-[0.12em] text-faint">
+                  Source
+                </div>
+                <div className="mt-1 text-[11px] text-ink">Shopify orders</div>
+              </div>
+              <ArrowIcon />
+              <div>
+                <div className="font-mono text-[8px] uppercase tracking-[0.12em] text-faint">
+                  Destination
+                </div>
+                <div className="mt-1 text-[11px] text-ink">Google Sheets</div>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-between border-t border-rule pt-3">
+              <div>
+                <div className="font-mono text-[8px] uppercase tracking-[0.12em] text-faint">
+                  Schedule
+                </div>
+                <div className="mt-1 text-[11px] text-ink">
+                  Mondays at 8:00 AM
+                </div>
+              </div>
+              <div className="grid grid-cols-7 gap-1" aria-label="Runs every Monday">
+                {["M", "T", "W", "T", "F", "S", "S"].map((day, index) => (
+                  <span
+                    key={`${day}-${index}`}
+                    className={`grid size-5 place-items-center rounded-sm font-mono text-[8px] ${
+                      index === 0
+                        ? "bg-accent text-bg"
+                        : "border border-rule text-faint"
+                    }`}
+                  >
+                    {day}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 border-t border-rule pt-3 font-mono text-[9px] text-muted">
+            <span>Last run · 128 orders</span>
+            <span className="text-accent-bright">✓ Completed</span>
+            <span>Previous · 116 orders</span>
+            <span className="text-accent-bright">✓ Completed</span>
+          </div>
         </div>
       </div>
     </Panel>
