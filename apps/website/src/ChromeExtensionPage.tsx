@@ -8,60 +8,8 @@ import { SectionDivider } from "./components/SectionDivider";
 import { Text } from "./components/Text";
 import { CanvasAsciihedron } from "./components/CanvasAsciihedron";
 
-interface Example {
-  site: string;
-  siteTone: string;
-  task: string;
-}
-
 const CHROME_EXTENSION_URL =
   "https://chromewebstore.google.com/detail/libretto/ddjagimknfjnkaefgfjpcnanflaipbmn";
-
-const oneTimeExamples: Example[] = [
-  {
-    site: "Google Maps",
-    siteTone: "text-blue-300",
-    task: "Find ten dentists within five miles that are open on Saturdays, then put their names, ratings, and phone numbers in a Google Sheet.",
-  },
-  {
-    site: "Zillow",
-    siteTone: "text-blue-300",
-    task: "Make me a shortlist of two-bedroom apartments in Oakland under $3,500 with parking and in-unit laundry.",
-  },
-  {
-    site: "Amazon",
-    siteTone: "text-amber-bright",
-    task: "Compare the five highest-rated standing desks under $400 and summarize the differences in size, warranty, and delivery time.",
-  },
-  {
-    site: "Salesforce",
-    siteTone: "text-sky-300",
-    task: "Update these 32 customer accounts using the names, titles, and phone numbers in this spreadsheet.",
-  },
-];
-
-const repeatableExamples: Example[] = [
-  {
-    site: "Shopify → Google Sheets",
-    siteTone: "text-green-300",
-    task: "Every Monday at 8 AM, export last week's orders and add them to the team sales tracker.",
-  },
-  {
-    site: "Stripe → Email",
-    siteTone: "text-violet-300",
-    task: "Every weekday, download yesterday's payouts and email the finance team a summary.",
-  },
-  {
-    site: "Salesforce",
-    siteTone: "text-sky-300",
-    task: "Check for new enterprise leads every morning and send the account owner a prioritized list.",
-  },
-  {
-    site: "Vendor portal → Slack",
-    siteTone: "text-fuchsia-300",
-    task: "Check open orders twice a day and notify the operations channel whenever a delivery date changes.",
-  },
-];
 
 function ArrowIcon() {
   return (
@@ -179,35 +127,149 @@ function BrowserDemo() {
   );
 }
 
-function ExampleCard({ example, index }: { example: Example; index: number }) {
+function OneOffTaskGraphic() {
   return (
-    <Panel
-      padding="none"
-      radius="lg"
-      className="group flex min-h-[200px] flex-col overflow-hidden transition-colors hover:border-accent/30"
-    >
-      <div className="flex items-center justify-between border-b border-rule px-5 py-3">
-        <span className={`text-xs font-medium ${example.siteTone}`}>
-          {example.site}
+    <Panel padding="none" radius="lg" className="overflow-hidden">
+      <div className="flex items-center justify-between border-b border-rule bg-panel-hi/45 px-5 py-3.5">
+        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+          One-off task
         </span>
-        <span className="text-[10px] text-muted/35">0{index + 1}</span>
+        <span className="flex items-center gap-2 font-mono text-[10px] text-accent-bright">
+          <span className="size-1.5 rounded-full bg-accent" /> Complete
+        </span>
       </div>
-      <div className="flex flex-1 items-start p-5">
-        <Text as="p" size="sm" className="leading-relaxed text-ink/85">
-          “{example.task}”
-        </Text>
+      <div className="grid gap-0 md:grid-cols-[0.92fr_1.08fr]">
+        <div className="border-b border-rule p-5 md:border-r md:border-b-0">
+          <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+            Request
+          </div>
+          <p className="mt-3 text-sm leading-6 text-ink">
+            Find ten dentists nearby that are open Saturdays and add their
+            details to a Google Sheet.
+          </p>
+          <div className="mt-6 space-y-3 border-t border-rule pt-5 font-mono text-[11px] text-muted">
+            {[
+              "Searched Google Maps",
+              "Checked hours and ratings",
+              "Created the spreadsheet",
+            ].map((step) => (
+              <div key={step} className="flex items-center gap-3">
+                <span className="text-accent">✓</span>
+                <span>{step}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="bg-bg/35 p-5">
+          <div className="flex items-end justify-between border-b border-rule pb-3">
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+                Result
+              </div>
+              <div className="mt-1 text-sm text-ink">Saturday dentists</div>
+            </div>
+            <div className="font-mono text-[10px] text-muted">10 rows</div>
+          </div>
+          <div className="font-mono text-[10px] text-muted">
+            {[
+              ["Lake Dental", "4.9", "9–2"],
+              ["Grand Avenue", "4.8", "8–1"],
+              ["Temescal Smiles", "4.7", "9–3"],
+            ].map(([name, rating, hours]) => (
+              <div
+                key={name}
+                className="grid grid-cols-[1fr_38px_42px] gap-3 border-b border-rule/70 py-3 last:border-0"
+              >
+                <span className="text-ink/80">{name}</span>
+                <span>{rating}</span>
+                <span>{hours}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex items-center justify-between rounded border border-accent/20 bg-green-3/20 px-3 py-2.5 font-mono text-[10px] text-accent-bright">
+            <span>Google Sheet ready</span>
+            <ArrowIcon />
+          </div>
+        </div>
       </div>
     </Panel>
   );
 }
 
-function ExampleGrid({ examples }: { examples: Example[] }) {
+function WorkflowGraphic() {
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      {examples.map((example, index) => (
-        <ExampleCard key={example.site} example={example} index={index} />
-      ))}
-    </div>
+    <Panel padding="none" radius="lg" className="overflow-hidden">
+      <div className="flex items-center justify-between border-b border-rule bg-panel-hi/45 px-5 py-3.5">
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+            Saved workflow
+          </div>
+          <div className="mt-1 text-sm text-ink">Weekly sales tracker</div>
+        </div>
+        <span className="rounded border border-accent/20 bg-green-3/20 px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.1em] text-accent-bright">
+          Active
+        </span>
+      </div>
+      <div className="p-5">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+          <div className="rounded-md border border-rule bg-bg/45 p-4">
+            <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+              Source
+            </div>
+            <div className="mt-2 text-sm text-ink">Shopify orders</div>
+          </div>
+          <ArrowIcon />
+          <div className="rounded-md border border-rule bg-bg/45 p-4">
+            <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+              Destination
+            </div>
+            <div className="mt-2 text-sm text-ink">Google Sheets</div>
+          </div>
+        </div>
+        <div className="mt-4 flex items-center justify-between rounded-md border border-rule bg-bg/45 px-4 py-3">
+          <div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+              Schedule
+            </div>
+            <div className="mt-1 text-sm text-ink">Every Monday at 8:00 AM</div>
+          </div>
+          <div className="grid grid-cols-7 gap-1" aria-label="Runs every Monday">
+            {["M", "T", "W", "T", "F", "S", "S"].map((day, index) => (
+              <span
+                key={`${day}-${index}`}
+                className={`grid size-6 place-items-center rounded-sm font-mono text-[9px] ${
+                  index === 0
+                    ? "bg-accent text-bg"
+                    : "border border-rule text-faint"
+                }`}
+              >
+                {day}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="border-t border-rule bg-bg/35 px-5 py-4">
+        <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+          Recent runs
+        </div>
+        <div className="space-y-2 font-mono text-[10px]">
+          {[
+            ["Aug 17", "128 orders", "Completed"],
+            ["Aug 10", "116 orders", "Completed"],
+          ].map(([date, result, status]) => (
+            <div
+              key={date}
+              className="grid grid-cols-[62px_1fr_auto] items-center gap-3 border-t border-rule/70 pt-2 text-muted"
+            >
+              <span>{date}</span>
+              <span className="text-ink/75">{result}</span>
+              <span className="text-accent-bright">✓ {status}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Panel>
   );
 }
 
@@ -215,13 +277,11 @@ function StorySection({
   kicker,
   title,
   description,
-  examples,
   children,
 }: {
   kicker: string;
   title: string;
   description: string;
-  examples: Example[];
   children: ReactNode;
 }) {
   return (
@@ -243,9 +303,8 @@ function StorySection({
         >
           {description}
         </Text>
-        {children}
       </div>
-      <ExampleGrid examples={examples} />
+      <div>{children}</div>
     </section>
   );
 }
@@ -300,17 +359,6 @@ function Hero() {
         <BrowserDemo />
       </div>
     </section>
-  );
-}
-
-function CloudCallout() {
-  return (
-    <div className="mt-8 rounded-lg border border-accent/20 bg-green-3/20 p-4">
-      <Text as="p" size="xs" className="leading-relaxed text-muted">
-        Workflows run securely in the cloud. Close your laptop and Libretto
-        keeps going.
-      </Text>
-    </div>
   );
 }
 
@@ -395,24 +443,19 @@ export function ChromeExtensionPage() {
         >
           <SectionDivider />
           <StorySection
-            kicker="// GET A TASK DONE --"
-            title="Ask once. Get it done."
-            description="Tell the Libretto agent what you need in everyday language. It works across websites to complete the task while you focus on something else."
-            examples={oneTimeExamples}
+            kicker="// ONE-OFF TASKS --"
+            title="Delegate a browser task."
+            description="Describe the result you need. Libretto navigates the sites, handles the repetitive steps, and returns the finished work."
           >
-            <div className="mt-7 flex items-center gap-2 text-xs text-accent-bright">
-              Great for research, data entry, comparisons, and one-off admin
-              work
-            </div>
+            <OneOffTaskGraphic />
           </StorySection>
           <SectionDivider />
           <StorySection
-            kicker="// MAKE IT A WORKFLOW --"
-            title="Save it once. Run it anytime."
-            description="Turn any useful task into a dependable workflow. Run it with one click or choose a schedule and let Libretto take care of it in the cloud."
-            examples={repeatableExamples}
+            kicker="// REPEATABLE WORKFLOWS --"
+            title="Automate the tasks you repeat."
+            description="Save a completed task as a workflow. Run it on demand or put it on a schedule; cloud execution keeps it moving when your computer is closed."
           >
-            <CloudCallout />
+            <WorkflowGraphic />
           </StorySection>
           <SectionDivider />
           <PrivacyStrip />
