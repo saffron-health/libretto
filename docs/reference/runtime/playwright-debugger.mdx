@@ -112,9 +112,10 @@ secrets manager.
 
 The debugger uses Libretto's public GitHub App through Libretto Cloud.
 
-First use the [Libretto setup flow](https://libretto.sh/setup) to connect the
-repository. The flow verifies the GitHub user can access the installed Libretto
-GitHub App and stores the tenant/repository link. Then provide:
+First use the [Self-Healing Playwright dashboard](https://libretto.sh/dashboard/connected_repos)
+to connect the repository. Libretto verifies that the GitHub user can access
+the installed Libretto GitHub App and stores the tenant/repository link. Then
+[create an API key](https://libretto.sh/dashboard/api_keys) and provide it as:
 
 ```bash
 export LIBRETTO_API_KEY=...
