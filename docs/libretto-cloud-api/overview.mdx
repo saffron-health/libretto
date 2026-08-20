@@ -19,9 +19,9 @@ Authenticated routes use:
 - `Content-Type: application/json`
 - JSON request bodies for state-changing requests
 
-The RPC routes documented in this section wrap input as `{ "json": { ... } }`.
-Catalogue routes use direct JSON bodies as shown on the
-[Workflow catalogue](/libretto-cloud-api/catalogue) page.
+JSON request bodies documented in this section wrap input as
+`{ "json": { ... } }`, including catalogue `POST` routes. Catalogue `GET` and
+`DELETE` routes continue to receive input through query and path parameters.
 
 For example:
 
@@ -35,6 +35,53 @@ curl -X POST "https://api.libretto.sh/v1/jobs/get" \
     }
   }'
 ```
+
+### Response format
+
+Authenticated API routes, including catalogue routes, wrap successful
+responses in a top-level `json` field. The response fields listed on each
+endpoint page are inside that field. For example, a successful response has
+this shape:
+
+```json
+{
+  "json": {
+    "job_id": "<job-id>",
+    "status": "completed"
+  }
+}
+```
+
+API errors use the same envelope. Validation details, when present, are in
+`json.data`:
+
+```json
+{
+  "json": {
+    "defined": false,
+    "code": "BAD_REQUEST",
+    "status": 400,
+    "message": "Input validation failed",
+    "data": {
+      "issues": [
+        {
+          "validation": "uuid",
+          "code": "invalid_string",
+          "message": "Invalid uuid",
+          "path": ["id"]
+        }
+      ]
+    }
+  }
+}
+```
+
+Middleware or infrastructure can return a direct JSON error before a request
+reaches an API route handler. Always check the HTTP status before reading the
+body.
+
+The public `/catalogue/*` website routes are separate from the authenticated
+API and do not use this envelope.
 
 ### Authentication rules
 

@@ -34,7 +34,7 @@ async function cloudRestCall<TResult>(opts: {
     credential: opts.ctx.credential,
     method: opts.method ?? "GET",
     path: opts.path,
-    body: opts.body,
+    body: opts.body === undefined ? undefined : { json: opts.body },
   });
   const text = await response.text();
   let data: unknown;
@@ -45,8 +45,15 @@ async function cloudRestCall<TResult>(opts: {
       `Unexpected response from ${opts.path} (${response.status}). Try the command again.`,
     );
   }
+  const envelope =
+    data && typeof data === "object" ? (data as { json?: unknown }) : null;
+  const result = envelope?.json;
   if (!response.ok) {
-    const body = data as { error?: unknown; message?: unknown; code?: unknown };
+    const body = (result ?? data) as {
+      error?: unknown;
+      message?: unknown;
+      code?: unknown;
+    };
     throw new ApiCallError({
       message:
         typeof body.error === "string"
@@ -60,7 +67,12 @@ async function cloudRestCall<TResult>(opts: {
       path: opts.path,
     });
   }
-  return data as TResult;
+  if (!envelope || !("json" in envelope)) {
+    throw new Error(
+      `Unexpected response from ${opts.path} (${response.status}). Try the command again.`,
+    );
+  }
+  return result as TResult;
 }
 
 function printJsonOrLines(

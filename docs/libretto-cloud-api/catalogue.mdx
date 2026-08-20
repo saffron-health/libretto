@@ -73,18 +73,52 @@ All routes require `x-api-key`.
 | `POST` | `/v1/catalogue/bookmarks` | Save or update a bookmark. |
 | `DELETE` | `/v1/catalogue/bookmarks/:id` | Remove a bookmark. |
 
+All success and error responses use the top-level `json` envelope described in
+the [API overview](/libretto-cloud-api/overview). The two POST routes also wrap
+their request bodies in `json`; GET query/path parameters and DELETE path
+parameters remain unchanged.
+
 Poll run results with `POST /v1/jobs/get`. See
 [Jobs and logs](/libretto-cloud-api/jobs-and-logs) for the response fields.
+
+### Queue a run
+
+```bash
+curl -sS -X POST \
+  https://api.libretto.sh/v1/catalogue/run/acme/check-eligibility \
+  -H "x-api-key: $LIBRETTO_API_KEY" \
+  -H "content-type: application/json" \
+  -d '{
+    "json": {
+      "params": { "member_id": "member-123" },
+      "skip_callbacks": true
+    }
+  }'
+```
+
+```json
+{
+  "json": {
+    "success": true,
+    "job_id": "f7dcbb42-282b-49d7-b9eb-7c349a0c9e35",
+    "status": "queued",
+    "catalogue_workflow": "acme/check-eligibility",
+    "message": "Job queued — waiting for browser capacity"
+  }
+}
+```
 
 The bookmark save body uses this shape:
 
 ```json
 {
-  "workflow": "acme/check-eligibility",
-  "alias": "eligibility",
-  "notes": "Default west region",
-  "default_params": {
-    "region": "west"
+  "json": {
+    "workflow": "acme/check-eligibility",
+    "alias": "eligibility",
+    "notes": "Default west region",
+    "default_params": {
+      "region": "west"
+    }
   }
 }
 ```

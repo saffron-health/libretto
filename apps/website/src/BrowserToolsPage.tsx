@@ -6,6 +6,7 @@ import { Kicker } from "./components/Kicker";
 import { SectionDivider } from "./components/SectionDivider";
 import { ShellCommand } from "./components/ShellCommand";
 import { CanvasAsciihedron } from "./components/CanvasAsciihedron";
+import { HeroResourceLinks } from "./components/HeroResourceLinks";
 
 const INSTALL_COMMAND = "npm i libretto-browser-tools";
 
@@ -94,12 +95,19 @@ function BrowserToolsHero() {
             Six tools let any AI agent open a real browser, read the page, and
             act with Playwright.
           </Text>
-          <ShellCommand
-            ariaLabel="Copy browser tools install command"
-            command={INSTALL_COMMAND}
-            fathomEvent="Browser tools hero install copy"
-            className="max-w-[390px]"
-          />
+          <div className="flex w-fit flex-col items-center gap-3">
+            <ShellCommand
+              ariaLabel="Copy browser tools install command"
+              command={INSTALL_COMMAND}
+              fathomEvent="Browser tools hero install copy"
+              className="max-w-[390px]"
+            />
+            <HeroResourceLinks
+              docsHref="/docs/browser-tools/quickstart"
+              docsFathomEvent="Browser tools hero docs click"
+              talkFathomEvent="Browser tools hero talk to dev click"
+            />
+          </div>
         </div>
         <CodeWindow />
       </div>

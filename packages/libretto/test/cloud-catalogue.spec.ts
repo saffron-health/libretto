@@ -38,30 +38,36 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
     let body: unknown;
     if (path.startsWith("/v1/catalogue?q=")) {
       body = {
-        workflows: [
-          {
-            tenant_slug: "acme",
-            workflow_name: "patient-lookup",
-            description: "Find a patient",
-          },
-        ],
+        json: {
+          workflows: [
+            {
+              tenant_slug: "acme",
+              workflow_name: "patient-lookup",
+              description: "Find a patient",
+            },
+          ],
+        },
       };
     } else if (path === "/v1/catalogue/acme/patient-lookup") {
       body = {
-        tenant_slug: "acme",
-        workflow_name: "patient-lookup",
-        input_schema: { type: "object" },
-        credential_requirements: [],
+        json: {
+          tenant_slug: "acme",
+          workflow_name: "patient-lookup",
+          input_schema: { type: "object" },
+          credential_requirements: [],
+        },
       };
     } else if (
       path === "/v1/catalogue/bookmarks" &&
       request.method === "POST"
     ) {
       body = {
-        bookmark: {
-          id: bookmarkId,
-          workflow: "acme/patient-lookup",
-          alias: "patient",
+        json: {
+          bookmark: {
+            id: bookmarkId,
+            workflow: "acme/patient-lookup",
+            alias: "patient",
+          },
         },
       };
     } else if (
@@ -69,28 +75,30 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
       request.method === "GET"
     ) {
       body = {
-        workflows: [
-          {
-            id: bookmarkId,
-            alias: "patient",
-            tenant_slug: "acme",
-            workflow_name: "patient-lookup",
-            default_params: { region: "west" },
-            available: true,
-          },
-          {
-            id: unavailableBookmarkId,
-            alias: "retired",
-            tenant_slug: null,
-            workflow_name: null,
-            available: false,
-          },
-        ],
+        json: {
+          workflows: [
+            {
+              id: bookmarkId,
+              alias: "patient",
+              tenant_slug: "acme",
+              workflow_name: "patient-lookup",
+              default_params: { region: "west" },
+              available: true,
+            },
+            {
+              id: unavailableBookmarkId,
+              alias: "retired",
+              tenant_slug: null,
+              workflow_name: null,
+              available: false,
+            },
+          ],
+        },
       };
     } else if (
       path === "/v1/catalogue/run/acme/patient-lookup"
     ) {
-      body = { job_id: jobId, status: "queued" };
+      body = { json: { job_id: jobId, status: "queued" } };
     } else if (path === "/v1/jobs/get") {
       statusCalls += 1;
       body = {
@@ -102,7 +110,7 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
         },
       };
     } else if (path === `/v1/catalogue/bookmarks/${bookmarkId}`) {
-      body = { id: bookmarkId, removed: true };
+      body = { json: { id: bookmarkId, removed: true } };
     } else {
       response.writeHead(404, { "Content-Type": "application/json" });
       response.end(JSON.stringify({ error: `Unexpected path ${path}` }));
@@ -190,9 +198,11 @@ test("cloud workflow commands cover catalogue, runs, and saved workflows", async
         request.path === "/v1/catalogue/run/acme/patient-lookup",
     )?.body,
   ).toEqual({
-    params: { region: "west", patient_id: "p-1" },
-    credentials: { portal: "credential-1" },
-    skip_callbacks: true,
+    json: {
+      params: { region: "west", patient_id: "p-1" },
+      credentials: { portal: "credential-1" },
+      skip_callbacks: true,
+    },
   });
 });
 

@@ -283,7 +283,7 @@ function highlightJson(value: unknown): string {
 }
 
 function buildHostedAgentPrompt(workflow: HostedWorkflowDetail): string {
-  const runUrl = `${cloudApiUrl}/v1/hosted-workflows/run/${encodeURIComponent(workflow.tenant_slug)}/${encodeURIComponent(workflow.workflow_name)}`;
+  const runUrl = `${cloudApiUrl}/v1/catalogue/run/${encodeURIComponent(workflow.tenant_slug)}/${encodeURIComponent(workflow.workflow_name)}`;
   const credLines =
     workflow.credential_requirements.length === 0
       ? ["- (none)"]
@@ -311,12 +311,12 @@ function buildHostedAgentPrompt(workflow: HostedWorkflowDetail): string {
     `Run endpoint: POST ${runUrl}`,
     "",
     "Authenticate with your Libretto API key in the `x-api-key` header.",
-    "Pass a `credentials` map in the run body: each key is a required name below, and each value is either a credential id or a secret name from YOUR tenant:",
+    "Wrap the run input in a top-level `json` field. Put workflow input fields under `json.params`. Pass credentials under `json.credentials`: each key is a required name below, and each value is either a credential id or a secret name from YOUR tenant:",
     ...credLines,
     "",
     schemaBlock,
     "",
-    "Or poll instead of a callback by setting `\"skip_callbacks\": true` and calling `POST /v1/jobs/get` with the returned `job_id`.",
+    "Or poll instead of a callback by setting `json.skip_callbacks` to `true` and calling `POST /v1/jobs/get` with the returned `job_id`.",
     "Jobs and credentials stay in your tenant. The publisher cannot see your identity, inputs, credentials, outputs, errors, or job details.",
   ]
     .filter((line): line is string => line !== null)
@@ -535,7 +535,7 @@ function CredentialsReference({
           Credentials
         </h2>
         <Text as="p" size="sm" className="mt-2 leading-6 text-muted">
-          Pass these values under <code className="text-ink">credentials</code>{" "}
+          Pass these values under <code className="text-ink">json.credentials</code>{" "}
           in the request body.
         </Text>
       </div>
@@ -824,7 +824,7 @@ export function HostedWorkflowPage({
   }
 
   const prompt = buildHostedAgentPrompt(workflow);
-  const runUrl = `${cloudApiUrl}/v1/hosted-workflows/run/${encodeURIComponent(workflow.tenant_slug)}/${encodeURIComponent(workflow.workflow_name)}`;
+  const runUrl = `${cloudApiUrl}/v1/catalogue/run/${encodeURIComponent(workflow.tenant_slug)}/${encodeURIComponent(workflow.workflow_name)}`;
   const returnTo = hostedPath(workflow);
   const canViewSource = workflow.source_access === "granted";
   const showSource = canViewSource && activeView === "source";
@@ -904,13 +904,28 @@ export function HostedWorkflowPage({
                 />
               </section>
 
+              <section>
+                <div className="border-b border-rule pb-4">
+                  <h2 className="text-2xl font-medium tracking-tight text-ink">
+                    Request envelope
+                  </h2>
+                </div>
+                <ParamRow
+                  name="json"
+                  typeLabel="object"
+                  required
+                  description="Wrap params, credentials, and run options in this top-level field."
+                  extras={[]}
+                />
+              </section>
+
               <CredentialsReference
                 requirements={workflow.credential_requirements}
               />
 
               <SchemaReference
                 title="Request fields"
-                description="Pass these fields under params in the JSON request body."
+                description="Pass these fields under json.params in the request body."
                 schema={workflow.input_schema}
                 emptyLabel="This workflow has no declared request fields."
               />

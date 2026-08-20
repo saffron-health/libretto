@@ -9,9 +9,9 @@ import { SectionIntro } from "./components/SectionIntro";
 import { SiteSection } from "./components/SiteSection";
 import { SectionDivider } from "./components/SectionDivider.js";
 import { CanvasAsciihedron } from "./components/CanvasAsciihedron";
+import { HeroResourceLinks } from "./components/HeroResourceLinks";
 
 const GET_STARTED_URL = "/signin?mode=signup";
-const TALK_TO_A_DEV_URL = "https://cal.com/team/libretto/demo";
 
 const SECTION_POINTS = [
   {
@@ -83,21 +83,6 @@ const PR_AGENT_FAQS: FAQItem[] = [
   },
 ];
 
-function TalkToADevLink({ fathomEvent }: { fathomEvent: string }) {
-  return (
-    <div className="text-xs text-muted">
-      or{" "}
-      <a
-        href={TALK_TO_A_DEV_URL}
-        className="text-muted underline decoration-muted decoration-1 underline-offset-4 transition-colors duration-100 hover:text-ink hover:decoration-accent"
-        data-fathom-event={fathomEvent}
-      >
-        TALK TO A DEV
-      </a>
-    </div>
-  );
-}
-
 function DebugAgentsHero() {
   return (
     <section className="relative overflow-hidden px-6 pt-16 pb-20 md:px-8 md:pt-24 md:pb-28">
@@ -137,7 +122,7 @@ function DebugAgentsHero() {
             Libretto investigates the live page and opens a GitHub pull request
             with a proposed code fix.
           </Text>
-          <div className="flex flex-col items-start gap-3">
+          <div className="flex w-fit flex-col items-center gap-3">
             <Button
               href={GET_STARTED_URL}
               className="h-12 min-w-[240px] px-8 text-sm"
@@ -145,7 +130,11 @@ function DebugAgentsHero() {
             >
               Get started
             </Button>
-            <TalkToADevLink fathomEvent="Debug agents hero talk to dev click" />
+            <HeroResourceLinks
+              docsHref="/docs/understand-libretto/autofix-debugging"
+              docsFathomEvent="Debug agents hero docs click"
+              talkFathomEvent="Debug agents hero talk to dev click"
+            />
           </div>
         </div>
         <GitHubPRMock className="w-full text-left" />
