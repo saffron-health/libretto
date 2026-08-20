@@ -19,9 +19,9 @@ Authenticated routes use:
 - `Content-Type: application/json`
 - JSON request bodies for state-changing requests
 
-The RPC routes documented in this section wrap input as `{ "json": { ... } }`.
-Catalogue routes use direct JSON bodies as shown on the
-[Workflow catalogue](/libretto-cloud-api/catalogue) page.
+JSON request bodies documented in this section wrap input as
+`{ "json": { ... } }`, including catalogue `POST` routes. Catalogue `GET` and
+`DELETE` routes continue to receive input through query and path parameters.
 
 For example:
 
@@ -38,9 +38,10 @@ curl -X POST "https://api.libretto.sh/v1/jobs/get" \
 
 ### Response format
 
-The RPC handler wraps successful responses in a top-level `json` field. The
-response fields listed on each endpoint page are inside that field. For
-example, a successful response has this shape:
+Authenticated API routes, including catalogue routes, wrap successful
+responses in a top-level `json` field. The response fields listed on each
+endpoint page are inside that field. For example, a successful response has
+this shape:
 
 ```json
 {
@@ -51,8 +52,8 @@ example, a successful response has this shape:
 }
 ```
 
-Errors returned by the RPC handler use the same envelope. Validation details,
-when present, are in `json.data`:
+API errors use the same envelope. Validation details, when present, are in
+`json.data`:
 
 ```json
 {
@@ -76,9 +77,11 @@ when present, are in `json.data`:
 ```
 
 Middleware or infrastructure can return a direct JSON error before a request
-reaches the RPC handler. Always check the HTTP status before reading the body.
+reaches an API route handler. Always check the HTTP status before reading the
+body.
 
-Catalogue routes return direct JSON responses without this RPC envelope.
+The public `/catalogue/*` website routes are separate from the authenticated
+API and do not use this envelope.
 
 ### Authentication rules
 
