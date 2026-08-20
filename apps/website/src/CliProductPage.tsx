@@ -12,6 +12,7 @@ import { Text } from "./components/Text";
 import { InstallSnippet } from "./components/InstallSnippet";
 import { Kicker } from "./components/Kicker";
 import { CanvasAsciihedron } from "./components/CanvasAsciihedron";
+import { HeroResourceLinks } from "./components/HeroResourceLinks";
 
 const DEMO_VIDEO_SRC = "/demos/cli-demo.mp4";
 const DEMO_VIDEO_SOURCE =
@@ -55,18 +56,13 @@ function CliHero() {
             An open-source CLI that records live browser workflows and compiles
             them into fast, reusable scripts in your codebase.
           </Text>
-          <div className="flex flex-col items-start gap-3">
+          <div className="flex w-fit flex-col items-center gap-3">
             <InstallSnippet />
-            <div className="text-xs text-muted">
-              or{" "}
-              <a
-                href="https://cal.com/team/libretto/demo"
-                className="text-muted underline decoration-muted decoration-1 underline-offset-4 transition-colors duration-100 hover:text-ink hover:decoration-accent"
-                data-fathom-event="CLI hero demo click"
-              >
-                TALK TO A DEV
-              </a>
-            </div>
+            <HeroResourceLinks
+              docsHref="/docs/get-started/quickstart"
+              docsFathomEvent="CLI hero docs click"
+              talkFathomEvent="CLI hero demo click"
+            />
           </div>
         </div>
         <div className="w-full overflow-hidden rounded-xl border border-rule bg-panel/50 shadow-lg shadow-black/30">
