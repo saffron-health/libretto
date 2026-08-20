@@ -18,10 +18,10 @@ The project must already depend on Playwright.
 
 ## Configure authentication
 
-1. Open the [Self-Healing Playwright dashboard](https://libretto.sh/dashboard/connected_repos)
+1. [Create a Libretto Cloud API key](https://libretto.sh/dashboard/api_keys).
+2. Set `LIBRETTO_API_KEY` in the environment that runs the automation.
+3. Open the [Self-Healing Playwright dashboard](https://libretto.sh/dashboard/connected_repos)
    and install the Libretto GitHub App for the target repository.
-2. [Create a Libretto Cloud API key](https://libretto.sh/dashboard/api_keys).
-3. Set `LIBRETTO_API_KEY` in the environment that runs the automation.
 4. Set the API key for the configured model provider: `OPENAI_API_KEY` for an
    `openai/...` model or `ANTHROPIC_API_KEY` for an `anthropic/...` model.
 
