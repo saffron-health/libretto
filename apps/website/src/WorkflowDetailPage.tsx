@@ -7,6 +7,10 @@ import {
 } from "./cloudApi";
 import { DashboardShell } from "./AuthenticatedDashboardPage";
 import { CheckIcon, CopyIcon } from "./icons/index.js";
+import {
+  browserViewAction,
+  shouldRefreshBrowserView,
+} from "./browserView.js";
 
 type Publication = {
   description: string | null;
@@ -47,6 +51,9 @@ type WorkflowRun = {
   started_at: string | null;
   completed_at: string | null;
   failure_class: string | null;
+  browser_session_status: string | null;
+  live_view_url: string | null;
+  recording_url: string | null;
 };
 
 type PrivacyFinding = {
@@ -307,6 +314,9 @@ function WorkflowRunsTable({ runs }: { runs: WorkflowRun[] }) {
             <th className="px-5 py-3 text-left text-[10px] font-medium uppercase tracking-[0.08em] text-muted">
               Result
             </th>
+            <th className="px-5 py-3 text-left text-[10px] font-medium uppercase tracking-[0.08em] text-muted">
+              View
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -324,11 +334,29 @@ function WorkflowRunsTable({ runs }: { runs: WorkflowRun[] }) {
               <td className="px-5 py-4 text-sm text-muted">
                 {run.failure_class ?? (run.status === "completed" ? "Completed" : "—")}
               </td>
+              <td className="px-5 py-4 text-sm">
+                <WorkflowRunViewLink run={run} />
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
+  );
+}
+
+function WorkflowRunViewLink({ run }: { run: WorkflowRun }) {
+  const action = browserViewAction(run);
+  if (!action) return <span className="text-muted/50">—</span>;
+  return (
+    <a
+      href={action.url}
+      target="_blank"
+      rel="noreferrer"
+      className="font-mono text-[10px] uppercase tracking-[0.08em] text-accent-bright no-underline hover:text-ink"
+    >
+      {action.label}
+    </a>
   );
 }
 
@@ -438,6 +466,26 @@ export function WorkflowDetailPage({ workflow }: { workflow: string }) {
         ),
       );
   }, [workflow]);
+
+  const hasActiveWorkflowRun = workflowRuns.some(shouldRefreshBrowserView);
+  useEffect(() => {
+    if (!session || !hasActiveWorkflowRun) return;
+    const timer = window.setInterval(() => {
+      orpcCall<{ jobs: WorkflowRun[] }>("/v1/dashboard/jobs", {
+        workflow,
+        limit: 100,
+      })
+        .then((result) => setWorkflowRuns(result.jobs))
+        .catch((cause) =>
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : "Could not refresh workflow runs.",
+          ),
+        );
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [hasActiveWorkflowRun, session, workflow]);
 
   async function runAction(name: string, action: () => Promise<void>) {
     setBusy(name);

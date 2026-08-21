@@ -12,6 +12,10 @@ import { InstallSnippet } from "./components/InstallSnippet";
 import { GitHubIcon } from "./icons";
 import { DEBUGGER_PROMPT, GITHUB_APP_INSTALL_URL } from "./prAgentSetup";
 import type { DashboardSection } from "./dashboardSections";
+import {
+  browserViewAction,
+  shouldRefreshBrowserView,
+} from "./browserView.js";
 
 const CLOUD_SETUP_PROMPT =
   "Fetch and follow https://libretto.sh/cloud.md to set up Libretto Cloud hosted browsers for this project.";
@@ -770,18 +774,41 @@ interface JobRow {
   started_at: string | null;
   completed_at: string | null;
   failure_class: string | null;
+  browser_session_status: string | null;
+  live_view_url: string | null;
+  recording_url: string | null;
 }
 function WorkflowRunsTable() {
   const [rows, setRows] = useState<JobRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    orpcCall<{ jobs: JobRow[] }>("/v1/dashboard/jobs", { limit: 100 })
-      .then((r) => setRows(r.jobs))
-      .catch((err) =>
+    let cancelled = false;
+    let timer: number | undefined;
+    async function loadRows() {
+      try {
+        const result = await orpcCall<{ jobs: JobRow[] }>(
+          "/v1/dashboard/jobs",
+          { limit: 100 },
+        );
+        if (cancelled) return;
+        setRows(result.jobs);
+        setError(null);
+        if (result.jobs.some(shouldRefreshBrowserView)) {
+          timer = window.setTimeout(loadRows, 3000);
+        }
+      } catch (err) {
+        if (cancelled) return;
         setError(
           err instanceof Error ? err.message : "Could not load workflow runs.",
-        ),
-      );
+        );
+        timer = window.setTimeout(loadRows, 3000);
+      }
+    }
+    void loadRows();
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
   }, []);
   return (
     <TableShell>
@@ -793,6 +820,7 @@ function WorkflowRunsTable() {
             <th className={thClass}>Started</th>
             <th className={thClass}>Runtime</th>
             <th className={thClass}>Result</th>
+            <th className={thClass}>View</th>
             <th className={thClass}>Run ID</th>
           </tr>
         </thead>
@@ -820,6 +848,9 @@ function WorkflowRunsTable() {
                 {row.failure_class ||
                   (row.status === "completed" ? "Completed" : "—")}
               </td>
+              <td className={tdClass}>
+                <BrowserViewLink row={row} />
+              </td>
               <td
                 className={`${tdClass} max-w-[190px] truncate font-mono text-xs`}
               >
@@ -844,11 +875,11 @@ function WorkflowRunsTable() {
 
 interface SessionRow {
   session_id: string;
-  browser_provider: string | null;
   status: string;
   source: string | null;
   owner_type: string | null;
   live_view_url: string | null;
+  recording_url: string | null;
   started_at: string;
   duration_ms: number | null;
 }
@@ -856,17 +887,42 @@ function BrowserSessionsTable() {
   const [rows, setRows] = useState<SessionRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    orpcCall<{ sessions: SessionRow[] }>("/v1/dashboard/sessions", {
-      limit: 100,
-    })
-      .then((r) => setRows(r.sessions))
-      .catch((err) =>
+    let cancelled = false;
+    let timer: number | undefined;
+    async function loadRows() {
+      try {
+        const result = await orpcCall<{ sessions: SessionRow[] }>(
+          "/v1/dashboard/sessions",
+          { limit: 100 },
+        );
+        if (cancelled) return;
+        setRows(result.sessions);
+        setError(null);
+        if (
+          result.sessions.some((row) =>
+            shouldRefreshBrowserView({
+              status: row.status,
+              browser_session_status: row.status,
+            }),
+          )
+        ) {
+          timer = window.setTimeout(loadRows, 3000);
+        }
+      } catch (err) {
+        if (cancelled) return;
         setError(
           err instanceof Error
             ? err.message
             : "Could not load browser sessions.",
-        ),
-      );
+        );
+        timer = window.setTimeout(loadRows, 3000);
+      }
+    }
+    void loadRows();
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
   }, []);
   return (
     <TableShell>
@@ -876,10 +932,9 @@ function BrowserSessionsTable() {
             <th className={thClass}>Session</th>
             <th className={thClass}>Status</th>
             <th className={thClass}>Source</th>
-            <th className={thClass}>Provider</th>
             <th className={thClass}>Started</th>
             <th className={thClass}>Runtime</th>
-            <th className={thClass}>Live view</th>
+            <th className={thClass}>View</th>
           </tr>
         </thead>
         <tbody>
@@ -896,22 +951,10 @@ function BrowserSessionsTable() {
               <td className={tdClass}>
                 {titleCase(row.source ?? row.owner_type ?? "browser")}
               </td>
-              <td className={tdClass}>{row.browser_provider || "—"}</td>
               <td className={tdClass}>{formatDate(row.started_at)}</td>
               <td className={tdClass}>{formatDuration(row.duration_ms)}</td>
               <td className={tdClass}>
-                {row.live_view_url ? (
-                  <a
-                    href={row.live_view_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={tableActionClass}
-                  >
-                    Open
-                  </a>
-                ) : (
-                  <span className="text-xs text-muted/50">—</span>
-                )}
+                <BrowserViewLink row={row} />
               </td>
             </tr>
           ))}
@@ -927,6 +970,25 @@ function BrowserSessionsTable() {
       )}
       {error && <EmptyTable message={error} />}
     </TableShell>
+  );
+}
+
+function BrowserViewLink({
+  row,
+}: {
+  row: { live_view_url: string | null; recording_url: string | null };
+}) {
+  const action = browserViewAction(row);
+  if (!action) return <span className="text-xs text-muted/50">—</span>;
+  return (
+    <a
+      href={action.url}
+      target="_blank"
+      rel="noreferrer"
+      className={tableActionClass}
+    >
+      {action.label}
+    </a>
   );
 }
 
